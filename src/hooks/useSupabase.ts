@@ -417,3 +417,81 @@ export const useKPIs = (requestId?: string) => {
 
   return { kpis, loading, error, addKPI, updateKPI, refetch: fetchKPIs };
 };
+
+// New hook for ROI impact tracking
+export const useROIImpactTracking = () => {
+  const { requests } = useInvestmentRequests();
+  const { logs } = useApprovalLogs();
+  const { kpis } = useKPIs();
+
+  // Calculate ROI impact for all requests
+  const calculateROIImpacts = () => {
+    return requests.map(request => {
+      // Get KPI data for original ROI
+      const requestKPIs = kpis.filter(kpi => kpi.request_id === request.id);
+      const originalROI = requestKPIs.length > 0 ? requestKPIs[0].irr : 15; // Default 15% if no KPI
+
+      // Get approval timeline
+      const requestLogs = logs
+        .filter(log => log.request_id === request.id)
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+      const finalApprovalDate = requestLogs.find(log => 
+        log.status === 'Approved' || log.status === 'Rejected'
+      )?.timestamp || null;
+
+      // Calculate delay in weeks
+      const submissionDate = new Date(request.submitted_date);
+      const currentDate = new Date();
+      const finalDate = finalApprovalDate ? new Date(finalApprovalDate) : currentDate;
+      const delayInWeeks = Math.max(0, (finalDate.getTime() - submissionDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
+
+      // Calculate dynamic decay rate based on project characteristics
+      let decayRate = 0.75; // Base 0.75% per week
+      
+      // Adjust based on investment amount
+      const totalAmount = request.base_currency_capex + request.base_currency_opex;
+      if (totalAmount > 1000000) decayRate += 0.3;
+      else if (totalAmount > 500000) decayRate += 0.2;
+      else if (totalAmount > 100000) decayRate += 0.1;
+      
+      // Adjust based on business case type
+      if (request.business_case_type?.includes('IPO Prep')) decayRate += 0.5;
+      if (request.business_case_type?.includes('Compliance')) decayRate += 0.3;
+      if (request.business_case_type?.includes('Expansion')) decayRate += 0.2;
+      
+      // Apply ROI decay formula: ROI(d) = ROI₀ - (r × d)
+      const roiDecay = decayRate * delayInWeeks;
+      const adjustedROI = Math.max(0, originalROI - roiDecay);
+      const roiLoss = originalROI - adjustedROI;
+      
+      // Calculate financial impact
+      const projectedValue = totalAmount * (originalROI / 100);
+      const adjustedValue = totalAmount * (adjustedROI / 100);
+      const lostValue = projectedValue - adjustedValue;
+
+      return {
+        requestId: request.id,
+        projectTitle: request.project_title,
+        originalROI,
+        adjustedROI: Math.round(adjustedROI * 100) / 100,
+        roiLoss: Math.round(roiLoss * 100) / 100,
+        delayInWeeks: Math.round(delayInWeeks * 10) / 10,
+        decayRate,
+        lostValue: Math.round(lostValue),
+        submissionDate: request.submitted_date,
+        finalApprovalDate,
+        status: request.status,
+        department: request.department,
+        businessCaseTypes: request.business_case_type || []
+      };
+    });
+  };
+
+  return {
+    calculateROIImpacts,
+    requests,
+    logs,
+    kpis
+  };
+};
