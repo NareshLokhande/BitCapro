@@ -132,4 +132,4 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trigger_log_duplicate_approval_attempt
   BEFORE INSERT ON approval_log
   FOR EACH ROW
-  EXECUTE FUNCTION log_duplicate_approval_attempt(); 
+  EXECUTE FUNCTION log_duplicate_approval_attempt();

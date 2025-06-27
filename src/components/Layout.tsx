@@ -1,4 +1,5 @@
 import {
+  Bell,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -17,6 +18,7 @@ import {
 import React, { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import NotificationSystem from './NotificationSystem';
 
 // Types
 interface NavigationItem {
@@ -362,8 +364,12 @@ const Layout: React.FC = () => {
         </button>
       </div>
 
-      {/* Session timeout indicator */}
-      <div className="fixed top-4 right-4 z-40">
+      {/* Header controls */}
+      <div className="fixed top-4 right-4 z-40 flex items-center gap-3">
+        {/* Notification System */}
+        <NotificationSystem />
+        
+        {/* Session timeout indicator */}
         <div className="flex items-center px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200 text-xs text-gray-600">
           <Clock className="w-3 h-3 mr-1" />
           Auto-logout: 30min
