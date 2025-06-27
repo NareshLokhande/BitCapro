@@ -1,5 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { Session, User } from '@supabase/supabase-js';
+import React, {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { supabase } from '../lib/supabase';
 
 export interface UserProfile {
@@ -19,13 +27,17 @@ interface AuthContextType {
   profile: UserProfile | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, userData: { name: string; role: string; department: string }) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: any }>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  signUp: (
+    email: string,
+    password: string,
+    userData: { name: string; role: string; department: string },
+  ) => Promise<{ error: any }>; // eslint-disable-line @typescript-eslint/no-explicit-any
   signOut: () => Promise<void>;
   isAdmin: boolean;
   isApprover: boolean;
   isSubmitter: boolean;
-  canApprove: (amount: number, department: string) => boolean;
+  canApprove: (amount: number) => boolean;
   resetTimeout: () => void;
 }
 
@@ -56,7 +68,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
-  
+
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
@@ -96,7 +108,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Set warning timeout (5 minutes before logout)
     warningTimeoutRef.current = setTimeout(showWarning, WARNING_TIMEOUT);
-    
+
     // Set auto logout timeout (30 minutes)
     timeoutRef.current = setTimeout(handleAutoLogout, AUTO_LOGOUT_TIMEOUT);
   }, [user, clearTimeouts, handleAutoLogout, showWarning]);
@@ -118,8 +130,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     if (!user) return;
 
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    
+    const events = [
+      'mousedown',
+      'mousemove',
+      'keypress',
+      'scroll',
+      'touchstart',
+      'click',
+    ];
+
     const resetTimeoutHandler = () => {
       const now = Date.now();
       // Only reset if it's been more than 1 minute since last activity (to avoid excessive resets)
@@ -129,7 +148,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     // Add event listeners for user activity
-    events.forEach(event => {
+    events.forEach((event) => {
       document.addEventListener(event, resetTimeoutHandler, true);
     });
 
@@ -138,7 +157,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     return () => {
       // Cleanup event listeners
-      events.forEach(event => {
+      events.forEach((event) => {
         document.removeEventListener(event, resetTimeoutHandler, true);
       });
       clearTimeouts();
@@ -159,9 +178,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Show browser confirmation dialog
     const extendSession = window.confirm(
-      'Your session will expire in 5 minutes due to inactivity. Would you like to extend your session?'
+      'Your session will expire in 5 minutes due to inactivity. Would you like to extend your session?',
     );
-    
+
     handleWarningResponse(extendSession);
   }, [showTimeoutWarning, resetTimeout, handleAutoLogout]);
 
@@ -176,14 +195,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Get initial session
     const initializeAuth = async () => {
       if (initializingRef.current) return;
-      
+
       initializingRef.current = true;
-      
+
       try {
         console.log('Initializing auth...');
-        
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
+
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
         if (error) {
           console.error('Error getting session:', error);
           if (mountedRef.current) {
@@ -198,7 +220,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (mountedRef.current) {
           setSession(session);
           setUser(session?.user ?? null);
-          
+
           if (session?.user && !profileFetchedRef.current) {
             await fetchUserProfile(session.user.id);
           } else {
@@ -220,14 +242,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     initializeAuth();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email || 'No user');
-      
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(
+        'Auth state changed:',
+        event,
+        session?.user?.email || 'No user',
+      );
+
       if (mountedRef.current) {
         setSession(session);
         setUser(session?.user ?? null);
-        
-        if (session?.user && !profileFetchedRef.current) {
+
+        // Only fetch profile if this is not a sign in event (which we handle in signIn function)
+        if (
+          session?.user &&
+          !profileFetchedRef.current &&
+          event !== 'SIGNED_IN'
+        ) {
           await fetchUserProfile(session.user.id);
         } else if (!session?.user) {
           setProfile(null);
@@ -246,9 +279,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, [clearTimeouts]);
 
-  const fetchUserProfile = async (userId: string) => {
-    // Prevent multiple profile fetches
-    if (profileFetchedRef.current) {
+  const fetchUserProfile = async (
+    userId: string,
+    forceFetch: boolean = false,
+  ) => {
+    // Prevent multiple profile fetches unless forced (like during sign in)
+    if (profileFetchedRef.current && !forceFetch) {
       if (mountedRef.current) {
         setLoading(false);
         setAuthInitialized(true);
@@ -259,7 +295,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('Fetching user profile for:', userId);
       profileFetchedRef.current = true;
-      
+
       // First check if user profile exists
       const { data, error } = await supabase
         .from('user_profiles')
@@ -295,18 +331,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     profileFetchedRef.current = false; // Reset profile fetch flag
     try {
       console.log('Attempting to sign in:', email);
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-      
+
       if (error) {
         console.error('Sign in error:', error);
         setLoading(false);
         return { error };
       }
-      
+
       console.log('Sign in successful');
+
+      // Update user state immediately after successful sign in
+      if (data.user) {
+        setUser(data.user);
+        setSession(data.session);
+
+        // Fetch user profile with force flag
+        await fetchUserProfile(data.user.id, true);
+      }
+
+      setLoading(false);
       return { error: null };
     } catch (error) {
       console.error('Sign in exception:', error);
@@ -315,7 +362,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signUp = async (email: string, password: string, userData: { name: string; role: string; department: string }) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    userData: { name: string; role: string; department: string },
+  ) => {
     setLoading(true);
     profileFetchedRef.current = false; // Reset profile fetch flag
     try {
@@ -324,7 +375,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         email,
         password,
       });
-      
+
       if (authError) {
         setLoading(false);
         return { error: authError };
@@ -340,7 +391,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             name: userData.name,
             role: userData.role,
             department: userData.department,
-            active: true
+            active: true,
           });
 
         if (profileError) {
@@ -348,7 +399,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Don't return error here as auth user was created successfully
         }
       }
-      
+
       return { error: null };
     } catch (error) {
       setLoading(false);
@@ -373,18 +424,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const isApprover = profile?.role?.startsWith('Approver_') || false;
   const isSubmitter = profile?.role === 'Submitter';
 
-  const canApprove = (amount: number, department: string) => {
+  const canApprove = (amount: number) => {
     if (!profile || !isApprover) return false;
-    
+
     // This would typically check against the approval matrix
     // For now, simplified logic based on role level
     const level = parseInt(profile.role.split('_')[1] || '0');
-    
+
     if (level === 1) return amount <= 50000;
     if (level === 2) return amount <= 200000;
     if (level === 3) return amount <= 500000;
     if (level === 4) return true; // CEO can approve anything
-    
+
     return false;
   };
 
@@ -403,9 +454,5 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     resetTimeout,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

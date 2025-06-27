@@ -1,11 +1,12 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
+};
+  
 interface DemoUser {
   email: string;
   password: string;
@@ -26,7 +27,7 @@ const demoCredentials: DemoUser[] = [
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -37,10 +38,10 @@ Deno.serve(async (req) => {
       {
         auth: {
           autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
+          persistSession: false,
+        },
+      },
+    );
 
     let successCount = 0;
     let errorCount = 0;
@@ -49,18 +50,22 @@ Deno.serve(async (req) => {
     for (const user of demoCredentials) {
       try {
         // Create auth user
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: user.email,
-          password: user.password,
-          email_confirm: true
-        });
+        const { data: authData, error: authError } =
+          await supabaseAdmin.auth.admin.createUser({
+            email: user.email,
+            password: user.password,
+            email_confirm: true,
+          });
 
         if (authError) {
           if (authError.message.includes('already registered')) {
             // User already exists, try to create/update profile
-            const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-            const existingUser = existingUsers.users.find(u => u.email === user.email);
-            
+            const { data: existingUsers } =
+              await supabaseAdmin.auth.admin.listUsers();
+            const existingUser = existingUsers.users.find(
+              (u) => u.email === user.email,
+            );
+
             if (existingUser) {
               // Create or update user profile
               const { error: profileError } = await supabaseAdmin
@@ -71,7 +76,7 @@ Deno.serve(async (req) => {
                   name: user.name,
                   role: user.role,
                   department: user.department,
-                  active: true
+                  active: true,
                 });
 
               if (profileError) {
@@ -97,7 +102,7 @@ Deno.serve(async (req) => {
               name: user.name,
               role: user.role,
               department: user.department,
-              active: true
+              active: true,
             });
 
           if (profileError) {
@@ -120,32 +125,30 @@ Deno.serve(async (req) => {
       successCount,
       errorCount,
       errors,
-      message: successCount > 0 
-        ? `Successfully created/updated ${successCount} demo users!`
-        : 'No users were created successfully.'
+      message:
+        successCount > 0
+          ? `Successfully created/updated ${successCount} demo users!`
+          : 'No users were created successfully.',
     };
 
-    return new Response(
-      JSON.stringify(response),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      },
-    )
-
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
   } catch (error) {
     console.error('Error in create-demo-users function:', error);
-    
+
     return new Response(
       JSON.stringify({
         success: false,
-        error: 'Failed to create demo users. Please check your Supabase configuration.',
-        details: error.message
+        error:
+          'Failed to create demo users. Please check your Supabase configuration.',
+        details: error.message,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
       },
-    )
+    );
   }
-})
+});

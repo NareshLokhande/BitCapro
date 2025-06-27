@@ -1,6 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  UserPlus,
+  Zap,
+} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, Mail, Lock, Eye, EyeOff, AlertCircle, Zap, UserPlus, Users, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const LoginPage: React.FC = () => {
@@ -21,12 +31,26 @@ const LoginPage: React.FC = () => {
   // Show timeout message if user was auto-logged out
   useEffect(() => {
     if (timeoutParam === 'true') {
-      setError('Your session has expired due to inactivity. Please log in again.');
+      setError(
+        'Your session has expired due to inactivity. Please log in again.',
+      );
     }
   }, [timeoutParam]);
 
   if (user) {
     return <Navigate to={from} replace />;
+  }
+
+  // Show loading state during authentication
+  if (loading || isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Signing you in...</p>
+        </div>
+      </div>
+    );
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,12 +59,10 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     const { error } = await signIn(email, password);
-    
+
     if (error) {
       setError(error.message);
     }
-    
-    setIsLoading(false);
   };
 
   const demoCredentials = [
@@ -58,32 +80,40 @@ const LoginPage: React.FC = () => {
     setError('');
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-demo-users`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-demo-users`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
         },
-      });
+      );
 
       const result = await response.json();
 
       if (result.success) {
         if (result.successCount > 0) {
-          setCreationStatus(`✅ Successfully created/updated ${result.successCount} demo users!`);
+          setCreationStatus(
+            `✅ Successfully created/updated ${result.successCount} demo users!`,
+          );
         }
-        
+
         if (result.errorCount > 0) {
-          setError(`Some users could not be created: ${result.errors.join(', ')}`);
+          setError(
+            `Some users could not be created: ${result.errors.join(', ')}`,
+          );
         }
       } else {
         setError(result.error || 'Failed to create demo users');
         setCreationStatus('');
       }
-
     } catch (error) {
       console.error('Error creating demo users:', error);
-      setError('Failed to create demo users. Please check your network connection and try again.');
+      setError(
+        'Failed to create demo users. Please check your network connection and try again.',
+      );
       setCreationStatus('');
     } finally {
       setIsCreatingUsers(false);
@@ -99,9 +129,10 @@ const LoginPage: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       {/* Bolt Badge */}
       <div className="fixed top-4 right-4 z-50">
-        <a 
-          href="https://bolt.new" 
-          target="_blank" 
+        <a
+          href="https://bolt.new"
+          title="Built with Bolt"
+          target="_blank"
           rel="noopener noreferrer"
           className="flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
         >
@@ -127,25 +158,33 @@ const LoginPage: React.FC = () => {
                 </div>
               </div>
               <h2 className="text-2xl font-bold text-gray-900">Welcome Back</h2>
-              <p className="text-gray-600 mt-2">Sign in to your account to continue</p>
+              <p className="text-gray-600 mt-2">
+                Sign in to your account to continue
+              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
-                <div className={`border rounded-xl p-4 ${
-                  timeoutParam === 'true' 
-                    ? 'bg-yellow-50 border-yellow-200' 
-                    : 'bg-red-50 border-red-200'
-                }`}>
+                <div
+                  className={`border rounded-xl p-4 ${
+                    timeoutParam === 'true'
+                      ? 'bg-yellow-50 border-yellow-200'
+                      : 'bg-red-50 border-red-200'
+                  }`}
+                >
                   <div className="flex items-center">
                     {timeoutParam === 'true' ? (
                       <Clock className="w-5 h-5 text-yellow-600 mr-2" />
                     ) : (
                       <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
                     )}
-                    <p className={`text-sm ${
-                      timeoutParam === 'true' ? 'text-yellow-800' : 'text-red-800'
-                    }`}>
+                    <p
+                      className={`text-sm ${
+                        timeoutParam === 'true'
+                          ? 'text-yellow-800'
+                          : 'text-red-800'
+                      }`}
+                    >
                       {error}
                     </p>
                   </div>
@@ -162,7 +201,10 @@ const LoginPage: React.FC = () => {
               )}
 
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
                   Email Address
                 </label>
                 <div className="relative">
@@ -180,7 +222,10 @@ const LoginPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
                   Password
                 </label>
                 <div className="relative">
@@ -199,7 +244,11 @@ const LoginPage: React.FC = () => {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -233,7 +282,9 @@ const LoginPage: React.FC = () => {
           {/* Demo Credentials */}
           <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-8">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Demo Credentials</h3>
+              <h3 className="text-xl font-bold text-gray-900">
+                Demo Credentials
+              </h3>
               <button
                 onClick={createDemoUsers}
                 disabled={isCreatingUsers}
@@ -252,13 +303,17 @@ const LoginPage: React.FC = () => {
                 )}
               </button>
             </div>
-            
+
             <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
               <div className="flex items-start">
                 <AlertCircle className="w-5 h-5 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-yellow-800">
                   <p className="font-medium mb-1">First time setup required!</p>
-                  <p>Click "Create Demo Users" above to add these users to your Supabase database, then you can log in with any of the credentials below.</p>
+                  <p>
+                    Click "Create Demo Users" above to add these users to your
+                    Supabase database, then you can log in with any of the
+                    credentials below.
+                  </p>
                 </div>
               </div>
             </div>
@@ -268,15 +323,20 @@ const LoginPage: React.FC = () => {
                 <Clock className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-blue-800">
                   <p className="font-medium mb-1">Auto Logout Feature</p>
-                  <p>For security, you'll be automatically logged out after 30 minutes of inactivity. You'll receive a warning 5 minutes before logout.</p>
+                  <p>
+                    For security, you'll be automatically logged out after 30
+                    minutes of inactivity. You'll receive a warning 5 minutes
+                    before logout.
+                  </p>
                 </div>
               </div>
             </div>
 
             <p className="text-gray-600 mb-6">
-              Click on any credential below to auto-fill the login form and test different user roles:
+              Click on any credential below to auto-fill the login form and test
+              different user roles:
             </p>
-            
+
             <div className="space-y-3">
               {demoCredentials.map((cred, index) => (
                 <button
@@ -290,7 +350,9 @@ const LoginPage: React.FC = () => {
                         {cred.name}
                       </div>
                       <div className="text-sm text-gray-600">{cred.email}</div>
-                      <div className="text-xs text-blue-600 font-medium">{cred.role} • {cred.department}</div>
+                      <div className="text-xs text-blue-600 font-medium">
+                        {cred.role} • {cred.department}
+                      </div>
                     </div>
                     <div className="text-xs text-gray-400 font-mono">
                       {cred.password}
@@ -301,14 +363,32 @@ const LoginPage: React.FC = () => {
             </div>
 
             <div className="mt-6 p-4 bg-blue-100 rounded-xl">
-              <h4 className="font-semibold text-blue-900 mb-2">Role Permissions:</h4>
+              <h4 className="font-semibold text-blue-900 mb-2">
+                Role Permissions:
+              </h4>
               <ul className="text-sm text-blue-800 space-y-1">
-                <li><strong>Admin:</strong> Full system access, user management</li>
-                <li><strong>Approver_L4 (CEO):</strong> Approve any amount, view all requests</li>
-                <li><strong>Approver_L3 (CFO):</strong> Approve up to $500K, financial oversight</li>
-                <li><strong>Approver_L2 (Director):</strong> Approve up to $200K, department oversight</li>
-                <li><strong>Approver_L1 (Manager):</strong> Approve up to $50K, team oversight</li>
-                <li><strong>Submitter:</strong> Create and submit requests</li>
+                <li>
+                  <strong>Admin:</strong> Full system access, user management
+                </li>
+                <li>
+                  <strong>Approver_L4 (CEO):</strong> Approve any amount, view
+                  all requests
+                </li>
+                <li>
+                  <strong>Approver_L3 (CFO):</strong> Approve up to $500K,
+                  financial oversight
+                </li>
+                <li>
+                  <strong>Approver_L2 (Director):</strong> Approve up to $200K,
+                  department oversight
+                </li>
+                <li>
+                  <strong>Approver_L1 (Manager):</strong> Approve up to $50K,
+                  team oversight
+                </li>
+                <li>
+                  <strong>Submitter:</strong> Create and submit requests
+                </li>
               </ul>
             </div>
           </div>

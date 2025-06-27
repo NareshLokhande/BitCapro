@@ -5,7 +5,12 @@ export interface InvestmentRequest {
   description: string;
   legalEntity: string;
   location: string;
-  projectStatus: 'Planning' | 'In Progress' | 'Completed' | 'On Hold' | 'Cancelled';
+  projectStatus:
+    | 'Planning'
+    | 'In Progress'
+    | 'Completed'
+    | 'On Hold'
+    | 'Cancelled';
   purpose: string;
   isInBudget: boolean;
   capEx: number;
@@ -17,9 +22,15 @@ export interface InvestmentRequest {
   submittedDate: string;
   lastUpdated: string;
   priority: 'Low' | 'Medium' | 'High' | 'Critical';
-  status: 'Draft' | 'Submitted' | 'Under Review' | 'Approved' | 'Rejected' | 'On Hold';
+  status:
+    | 'Draft'
+    | 'Submitted'
+    | 'Under Review'
+    | 'Approved'
+    | 'Rejected'
+    | 'On Hold';
   category: string;
-  
+
   // Checklist fields
   strategicFit: boolean;
   riskAssessment: boolean;
@@ -40,13 +51,15 @@ export interface KPI {
 
 export interface ApprovalLog {
   id: string;
-  requestId: string;
-  approvedBy: string;
+  request_id: string;
+  approved_by: string;
   role: string;
   level: number;
   status: 'Approved' | 'Rejected' | 'Under Review' | 'On Hold' | 'Returned';
   comments: string;
   timestamp: string;
+  user_id?: string;
+  created_at?: string;
 }
 
 export interface ApprovalMatrix {

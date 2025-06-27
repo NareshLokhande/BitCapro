@@ -1,39 +1,30 @@
-import React, { useState, useMemo } from 'react';
 import {
-  Clock,
-  TrendingUp,
-  TrendingDown,
   AlertTriangle,
-  CheckCircle,
   BarChart3,
-  Filter,
   Calendar,
-  Users,
-  Target,
-  Zap,
-  ArrowRight,
+  CheckCircle,
   ChevronDown,
   ChevronUp,
+  Clock,
   DollarSign,
-  Timer
+  Filter,
+  Timer,
+  Zap,
 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
 import {
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  Area,
-  AreaChart,
-  Legend
 } from 'recharts';
-import { useInvestmentRequests, useApprovalLogs } from '../hooks/useSupabase';
+import { useApprovalLogs, useInvestmentRequests } from '../hooks/useSupabase';
 import { BUSINESS_CASE_TYPES } from '../lib/supabase';
 import ROIImpactTracker from './ROIImpactTracker';
+import StyledDropdown from './StyledDropdown';
 
 interface ApprovalTimeData {
   level: number;
@@ -64,11 +55,14 @@ interface RequestTimelineData {
 const ApprovalTimeTracker: React.FC = () => {
   const { requests, loading: requestsLoading } = useInvestmentRequests();
   const { logs, loading: logsLoading } = useApprovalLogs();
-  const [selectedBusinessCase, setSelectedBusinessCase] = useState<string>('All');
+  const [selectedBusinessCase, setSelectedBusinessCase] =
+    useState<string>('All');
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [timeRange, setTimeRange] = useState<'30' | '90' | '180' | '365'>('90');
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'approval-times' | 'roi-impact'>('approval-times');
+  const [activeView, setActiveView] = useState<'approval-times' | 'roi-impact'>(
+    'approval-times',
+  );
 
   // Calculate approval time data
   const approvalTimeData = useMemo(() => {
@@ -81,13 +75,16 @@ const ApprovalTimeTracker: React.FC = () => {
     // Group by business case type and level
     const groupedData: Record<string, Record<number, number[]>> = {};
 
-    requests.forEach(request => {
+    requests.forEach((request) => {
       if (new Date(request.submitted_date) < cutoffDate) return;
-      
+
       const businessCaseTypes = request.business_case_type || ['Unspecified'];
       const requestLogs = logs
-        .filter(log => log.request_id === request.id)
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        .filter((log) => log.request_id === request.id)
+        .sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+        );
 
       if (requestLogs.length === 0) return;
 
@@ -95,10 +92,12 @@ const ApprovalTimeTracker: React.FC = () => {
       const levelTimes: Record<number, number> = {};
       let previousTime = new Date(request.submitted_date).getTime();
 
-      requestLogs.forEach((log, index) => {
+      requestLogs.forEach((log) => {
         const currentTime = new Date(log.timestamp).getTime();
-        const timeAtLevel = Math.round((currentTime - previousTime) / (1000 * 60 * 60 * 24)); // days
-        
+        const timeAtLevel = Math.round(
+          (currentTime - previousTime) / (1000 * 60 * 60 * 24),
+        ); // days
+
         if (timeAtLevel > 0) {
           levelTimes[log.level] = timeAtLevel;
         }
@@ -106,7 +105,7 @@ const ApprovalTimeTracker: React.FC = () => {
       });
 
       // Add data for each business case type
-      businessCaseTypes.forEach(businessCaseType => {
+      businessCaseTypes.forEach((businessCaseType) => {
         if (!groupedData[businessCaseType]) {
           groupedData[businessCaseType] = {};
         }
@@ -125,18 +124,20 @@ const ApprovalTimeTracker: React.FC = () => {
     Object.entries(groupedData).forEach(([businessCaseType, levels]) => {
       Object.entries(levels).forEach(([level, times]) => {
         const levelNum = parseInt(level);
-        const averageTime = times.reduce((sum, time) => sum + time, 0) / times.length;
-        
+        const averageTime =
+          times.reduce((sum, time) => sum + time, 0) / times.length;
+
         // Define thresholds for fast/average/slow
         const fastThreshold = 2; // days
         const slowThreshold = 7; // days
-        
-        const fastCount = times.filter(time => time <= fastThreshold).length;
-        const slowCount = times.filter(time => time >= slowThreshold).length;
+
+        const fastCount = times.filter((time) => time <= fastThreshold).length;
+        const slowCount = times.filter((time) => time >= slowThreshold).length;
         const averageCount = times.length - fastCount - slowCount;
-        
+
         // Calculate bottleneck score (higher = more problematic)
-        const bottleneckScore = (averageTime * 0.6) + (slowCount / times.length * 40);
+        const bottleneckScore =
+          averageTime * 0.6 + (slowCount / times.length) * 40;
 
         data.push({
           level: levelNum,
@@ -146,7 +147,7 @@ const ApprovalTimeTracker: React.FC = () => {
           fastCount,
           averageCount,
           slowCount,
-          bottleneckScore: Math.round(bottleneckScore)
+          bottleneckScore: Math.round(bottleneckScore),
         });
       });
     });
@@ -167,27 +168,41 @@ const ApprovalTimeTracker: React.FC = () => {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - parseInt(timeRange));
 
-    requests.forEach(request => {
+    requests.forEach((request) => {
       if (new Date(request.submitted_date) < cutoffDate) return;
-      if (selectedBusinessCase !== 'All' && !request.business_case_type?.includes(selectedBusinessCase)) return;
+      if (
+        selectedBusinessCase !== 'All' &&
+        !request.business_case_type?.includes(selectedBusinessCase)
+      )
+        return;
 
       const requestLogs = logs
-        .filter(log => log.request_id === request.id)
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        .filter((log) => log.request_id === request.id)
+        .sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+        );
 
       if (requestLogs.length === 0) return;
 
-      const levelTimes: Array<{ level: number; time: number; status: 'fast' | 'average' | 'slow'; bottleneck: boolean }> = [];
+      const levelTimes: Array<{
+        level: number;
+        time: number;
+        status: 'fast' | 'average' | 'slow';
+        bottleneck: boolean;
+      }> = [];
       let previousTime = new Date(request.submitted_date).getTime();
       let totalTime = 0;
 
-      requestLogs.forEach(log => {
+      requestLogs.forEach((log) => {
         const currentTime = new Date(log.timestamp).getTime();
-        const timeAtLevel = Math.round((currentTime - previousTime) / (1000 * 60 * 60 * 24));
-        
+        const timeAtLevel = Math.round(
+          (currentTime - previousTime) / (1000 * 60 * 60 * 24),
+        );
+
         if (timeAtLevel > 0) {
           totalTime += timeAtLevel;
-          
+
           // Determine status
           let status: 'fast' | 'average' | 'slow' = 'average';
           if (timeAtLevel <= 2) status = 'fast';
@@ -197,7 +212,7 @@ const ApprovalTimeTracker: React.FC = () => {
             level: log.level,
             time: timeAtLevel,
             status,
-            bottleneck: false // Will be calculated below
+            bottleneck: false, // Will be calculated below
           });
         }
         previousTime = currentTime;
@@ -205,8 +220,8 @@ const ApprovalTimeTracker: React.FC = () => {
 
       // Identify bottlenecks (levels that took significantly longer than others)
       if (levelTimes.length > 1) {
-        const maxTime = Math.max(...levelTimes.map(lt => lt.time));
-        levelTimes.forEach(lt => {
+        const maxTime = Math.max(...levelTimes.map((lt) => lt.time));
+        levelTimes.forEach((lt) => {
           lt.bottleneck = lt.time === maxTime && lt.time >= 5; // Bottleneck if longest and >= 5 days
         });
       }
@@ -218,7 +233,7 @@ const ApprovalTimeTracker: React.FC = () => {
         totalTime,
         levelTimes,
         status: request.status,
-        department: request.department
+        department: request.department,
       });
     });
 
@@ -226,15 +241,18 @@ const ApprovalTimeTracker: React.FC = () => {
   }, [requests, logs, timeRange, selectedBusinessCase]);
 
   // Filter data for display
-  const filteredData = selectedBusinessCase === 'All' 
-    ? approvalTimeData 
-    : approvalTimeData.filter(d => d.businessCaseType === selectedBusinessCase);
+  const filteredData =
+    selectedBusinessCase === 'All'
+      ? approvalTimeData
+      : approvalTimeData.filter(
+          (d) => d.businessCaseType === selectedBusinessCase,
+        );
 
   // Chart data for average times by level
   const chartData = useMemo(() => {
     const levelData: Record<number, Record<string, number>> = {};
-    
-    filteredData.forEach(item => {
+
+    filteredData.forEach((item) => {
       if (!levelData[item.level]) {
         levelData[item.level] = {};
       }
@@ -243,31 +261,59 @@ const ApprovalTimeTracker: React.FC = () => {
 
     return Object.entries(levelData).map(([level, businessCases]) => ({
       level: `Level ${level}`,
-      ...businessCases
+      ...businessCases,
     }));
   }, [filteredData]);
 
   // Get performance badge
-  const getPerformanceBadge = (averageTime: number, slowCount: number, totalCount: number) => {
+  const getPerformanceBadge = (
+    averageTime: number,
+    slowCount: number,
+    totalCount: number,
+  ) => {
     const slowPercentage = (slowCount / totalCount) * 100;
-    
+
     if (averageTime <= 3 && slowPercentage <= 10) {
-      return { label: 'Fast', color: 'bg-green-100 text-green-800 border-green-200', icon: <Zap className="w-3 h-3" /> };
+      return {
+        label: 'Fast',
+        color: 'bg-green-100 text-green-800 border-green-200',
+        icon: <Zap className="w-3 h-3" />,
+      };
     } else if (averageTime <= 6 && slowPercentage <= 25) {
-      return { label: 'Average', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: <Clock className="w-3 h-3" /> };
+      return {
+        label: 'Average',
+        color: 'bg-blue-100 text-blue-800 border-blue-200',
+        icon: <Clock className="w-3 h-3" />,
+      };
     } else {
-      return { label: 'Slow', color: 'bg-red-100 text-red-800 border-red-200', icon: <AlertTriangle className="w-3 h-3" /> };
+      return {
+        label: 'Slow',
+        color: 'bg-red-100 text-red-800 border-red-200',
+        icon: <AlertTriangle className="w-3 h-3" />,
+      };
     }
   };
 
   // Get bottleneck indicator
   const getBottleneckIndicator = (bottleneckScore: number) => {
     if (bottleneckScore >= 30) {
-      return { label: 'High Bottleneck', color: 'text-red-600', icon: <AlertTriangle className="w-4 h-4" /> };
+      return {
+        label: 'High Bottleneck',
+        color: 'text-red-600',
+        icon: <AlertTriangle className="w-4 h-4" />,
+      };
     } else if (bottleneckScore >= 15) {
-      return { label: 'Medium Bottleneck', color: 'text-yellow-600', icon: <Clock className="w-4 h-4" /> };
+      return {
+        label: 'Medium Bottleneck',
+        color: 'text-yellow-600',
+        icon: <Clock className="w-4 h-4" />,
+      };
     } else {
-      return { label: 'Low Bottleneck', color: 'text-green-600', icon: <CheckCircle className="w-4 h-4" /> };
+      return {
+        label: 'Low Bottleneck',
+        color: 'text-green-600',
+        icon: <CheckCircle className="w-4 h-4" />,
+      };
     }
   };
 
@@ -276,7 +322,9 @@ const ApprovalTimeTracker: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-center h-32">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">Loading approval time data...</span>
+          <span className="ml-3 text-gray-600">
+            Loading approval time data...
+          </span>
         </div>
       </div>
     );
@@ -290,16 +338,24 @@ const ApprovalTimeTracker: React.FC = () => {
           <div className="flex items-center">
             <Clock className="w-8 h-8 mr-3" />
             <div>
-              <h3 className="text-xl font-bold">Approval Time & ROI Impact Tracker</h3>
-              <p className="text-indigo-100">Monitor approval bottlenecks and their impact on investment returns</p>
+              <h3 className="text-xl font-bold">
+                Approval Time & ROI Impact Tracker
+              </h3>
+              <p className="text-indigo-100">
+                Monitor approval bottlenecks and their impact on investment
+                returns
+              </p>
             </div>
           </div>
           <div className="text-right">
             <div className="text-2xl font-bold">
-              {filteredData.length > 0 
-                ? Math.round(filteredData.reduce((sum, d) => sum + d.averageTime, 0) / filteredData.length * 10) / 10
-                : 0
-              }
+              {filteredData.length > 0
+                ? Math.round(
+                    (filteredData.reduce((sum, d) => sum + d.averageTime, 0) /
+                      filteredData.length) *
+                      10,
+                  ) / 10
+                : 0}
             </div>
             <div className="text-indigo-100 text-sm">Avg Days</div>
           </div>
@@ -309,7 +365,9 @@ const ApprovalTimeTracker: React.FC = () => {
       {/* View Toggle */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center gap-4 mb-4">
-          <h4 className="text-lg font-semibold text-gray-900">Analysis Views</h4>
+          <h4 className="text-lg font-semibold text-gray-900">
+            Analysis Views
+          </h4>
         </div>
         <div className="flex gap-2">
           <button
@@ -339,7 +397,7 @@ const ApprovalTimeTracker: React.FC = () => {
 
       {/* Conditional Content */}
       {activeView === 'roi-impact' ? (
-        <ROIImpactTracker 
+        <ROIImpactTracker
           selectedBusinessCase={selectedBusinessCase}
           timeRange={timeRange}
         />
@@ -353,46 +411,58 @@ const ApprovalTimeTracker: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Business Case Type</label>
-                <select
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Business Case Type
+                </label>
+                <StyledDropdown
                   value={selectedBusinessCase}
                   onChange={(e) => setSelectedBusinessCase(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="All Business Cases"
                 >
                   <option value="All">All Business Cases</option>
-                  {BUSINESS_CASE_TYPES.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
+                  {BUSINESS_CASE_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
                   ))}
-                </select>
+                </StyledDropdown>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Time Range</label>
-                <select
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Time Range
+                </label>
+                <StyledDropdown
                   value={timeRange}
                   onChange={(e) => setTimeRange(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Last 30 days"
                 >
                   <option value="30">Last 30 days</option>
                   <option value="90">Last 90 days</option>
                   <option value="180">Last 6 months</option>
                   <option value="365">Last year</option>
-                </select>
+                </StyledDropdown>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Focus Level</label>
-                <select
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Focus Level
+                </label>
+                <StyledDropdown
                   value={selectedLevel || ''}
-                  onChange={(e) => setSelectedLevel(e.target.value ? parseInt(e.target.value) : null)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  onChange={(e) =>
+                    setSelectedLevel(
+                      e.target.value ? parseInt(e.target.value) : null,
+                    )
+                  }
+                  placeholder="All Levels"
                 >
                   <option value="">All Levels</option>
                   <option value="1">Level 1 (Manager)</option>
                   <option value="2">Level 2 (Director)</option>
                   <option value="3">Level 3 (CFO)</option>
                   <option value="4">Level 4 (CEO)</option>
-                </select>
+                </StyledDropdown>
               </div>
             </div>
           </div>
@@ -402,12 +472,21 @@ const ApprovalTimeTracker: React.FC = () => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Avg Processing Time</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Avg Processing Time
+                  </p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">
-                    {filteredData.length > 0 
-                      ? Math.round(filteredData.reduce((sum, d) => sum + d.averageTime, 0) / filteredData.length * 10) / 10
-                      : 0
-                    } days
+                    {filteredData.length > 0
+                      ? Math.round(
+                          (filteredData.reduce(
+                            (sum, d) => sum + d.averageTime,
+                            0,
+                          ) /
+                            filteredData.length) *
+                            10,
+                        ) / 10
+                      : 0}{' '}
+                    days
                   </p>
                 </div>
                 <div className="flex items-center justify-center w-12 h-12 bg-blue-50 rounded-xl">
@@ -419,7 +498,9 @@ const ApprovalTimeTracker: React.FC = () => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Fast Approvals</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Fast Approvals
+                  </p>
                   <p className="text-2xl font-bold text-green-600 mt-1">
                     {filteredData.reduce((sum, d) => sum + d.fastCount, 0)}
                   </p>
@@ -434,7 +515,9 @@ const ApprovalTimeTracker: React.FC = () => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Slow Approvals</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Slow Approvals
+                  </p>
                   <p className="text-2xl font-bold text-red-600 mt-1">
                     {filteredData.reduce((sum, d) => sum + d.slowCount, 0)}
                   </p>
@@ -449,9 +532,11 @@ const ApprovalTimeTracker: React.FC = () => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Bottlenecks</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Bottlenecks
+                  </p>
                   <p className="text-2xl font-bold text-orange-600 mt-1">
-                    {filteredData.filter(d => d.bottleneckScore >= 30).length}
+                    {filteredData.filter((d) => d.bottleneckScore >= 30).length}
                   </p>
                   <p className="text-xs text-gray-500">High impact</p>
                 </div>
@@ -466,7 +551,9 @@ const ApprovalTimeTracker: React.FC = () => {
           {chartData.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between mb-6">
-                <h4 className="text-lg font-semibold text-gray-900">Average Processing Time by Level</h4>
+                <h4 className="text-lg font-semibold text-gray-900">
+                  Average Processing Time by Level
+                </h4>
                 <BarChart3 className="w-5 h-5 text-gray-400" />
               </div>
               <div className="h-80">
@@ -474,16 +561,26 @@ const ApprovalTimeTracker: React.FC = () => {
                   <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="level" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} label={{ value: 'Days', angle: -90, position: 'insideLeft' }} />
-                    <Tooltip 
-                      formatter={(value: number, name: string) => [`${value} days`, name]}
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      label={{
+                        value: 'Days',
+                        angle: -90,
+                        position: 'insideLeft',
+                      }}
+                    />
+                    <Tooltip
+                      formatter={(value: number, name: string) => [
+                        `${value} days`,
+                        name,
+                      ]}
                       labelStyle={{ color: '#374151' }}
                     />
                     <Legend />
                     {BUSINESS_CASE_TYPES.map((type, index) => (
-                      <Bar 
+                      <Bar
                         key={type.value}
-                        dataKey={type.value} 
+                        dataKey={type.value}
                         fill={`hsl(${(index * 60) % 360}, 70%, 50%)`}
                         name={type.label}
                         radius={[2, 2, 0, 0]}
@@ -498,7 +595,9 @@ const ApprovalTimeTracker: React.FC = () => {
           {/* Detailed Breakdown */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100">
             <div className="px-6 py-4 border-b border-gray-100">
-              <h4 className="text-lg font-semibold text-gray-900">Approval Level Performance</h4>
+              <h4 className="text-lg font-semibold text-gray-900">
+                Approval Level Performance
+              </h4>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -529,19 +628,32 @@ const ApprovalTimeTracker: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredData
-                    .filter(item => selectedLevel === null || item.level === selectedLevel)
+                    .filter(
+                      (item) =>
+                        selectedLevel === null || item.level === selectedLevel,
+                    )
                     .map((item, index) => {
-                      const performanceBadge = getPerformanceBadge(item.averageTime, item.slowCount, item.requestCount);
-                      const bottleneckIndicator = getBottleneckIndicator(item.bottleneckScore);
-                      
+                      const performanceBadge = getPerformanceBadge(
+                        item.averageTime,
+                        item.slowCount,
+                        item.requestCount,
+                      );
+                      const bottleneckIndicator = getBottleneckIndicator(
+                        item.bottleneckScore,
+                      );
+
                       return (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className="flex items-center justify-center w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg mr-3">
-                                <span className="text-sm font-bold">{item.level}</span>
+                                <span className="text-sm font-bold">
+                                  {item.level}
+                                </span>
                               </div>
-                              <span className="text-sm font-medium text-gray-900">Level {item.level}</span>
+                              <span className="text-sm font-medium text-gray-900">
+                                Level {item.level}
+                              </span>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -550,12 +662,18 @@ const ApprovalTimeTracker: React.FC = () => {
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{item.averageTime} days</div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {item.averageTime} days
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border ${performanceBadge.color}`}>
+                            <span
+                              className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border ${performanceBadge.color}`}
+                            >
                               {performanceBadge.icon}
-                              <span className="ml-1">{performanceBadge.label}</span>
+                              <span className="ml-1">
+                                {performanceBadge.label}
+                              </span>
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -575,9 +693,13 @@ const ApprovalTimeTracker: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className={`flex items-center ${bottleneckIndicator.color}`}>
+                            <div
+                              className={`flex items-center ${bottleneckIndicator.color}`}
+                            >
                               {bottleneckIndicator.icon}
-                              <span className="ml-1 text-sm font-medium">{bottleneckIndicator.label}</span>
+                              <span className="ml-1 text-sm font-medium">
+                                {bottleneckIndicator.label}
+                              </span>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -595,16 +717,28 @@ const ApprovalTimeTracker: React.FC = () => {
           {requestTimelineData.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100">
               <div className="px-6 py-4 border-b border-gray-100">
-                <h4 className="text-lg font-semibold text-gray-900">Request Timeline Analysis</h4>
-                <p className="text-sm text-gray-600">Individual request processing times with bottleneck identification</p>
+                <h4 className="text-lg font-semibold text-gray-900">
+                  Request Timeline Analysis
+                </h4>
+                <p className="text-sm text-gray-600">
+                  Individual request processing times with bottleneck
+                  identification
+                </p>
               </div>
               <div className="p-6 space-y-4">
                 {requestTimelineData.slice(0, 10).map((request) => (
-                  <div key={request.requestId} className="border border-gray-200 rounded-lg">
+                  <div
+                    key={request.requestId}
+                    className="border border-gray-200 rounded-lg"
+                  >
                     <button
-                      onClick={() => setExpandedRequest(
-                        expandedRequest === request.requestId ? null : request.requestId
-                      )}
+                      onClick={() =>
+                        setExpandedRequest(
+                          expandedRequest === request.requestId
+                            ? null
+                            : request.requestId,
+                        )
+                      }
                       className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex items-center flex-1">
@@ -612,15 +746,23 @@ const ApprovalTimeTracker: React.FC = () => {
                           <Calendar className="w-5 h-5 text-gray-600" />
                         </div>
                         <div className="flex-1">
-                          <h5 className="font-medium text-gray-900">{request.projectTitle}</h5>
+                          <h5 className="font-medium text-gray-900">
+                            {request.projectTitle}
+                          </h5>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-sm text-gray-600">{request.department}</span>
+                            <span className="text-sm text-gray-600">
+                              {request.department}
+                            </span>
                             <span className="text-gray-300">•</span>
-                            <span className="text-sm font-medium text-indigo-600">{request.totalTime} days total</span>
-                            {request.levelTimes.some(lt => lt.bottleneck) && (
+                            <span className="text-sm font-medium text-indigo-600">
+                              {request.totalTime} days total
+                            </span>
+                            {request.levelTimes.some((lt) => lt.bottleneck) && (
                               <>
                                 <span className="text-gray-300">•</span>
-                                <span className="text-sm text-red-600 font-medium">Bottleneck detected</span>
+                                <span className="text-sm text-red-600 font-medium">
+                                  Bottleneck detected
+                                </span>
                               </>
                             )}
                           </div>
@@ -629,7 +771,10 @@ const ApprovalTimeTracker: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <div className="flex flex-wrap gap-1">
                           {request.businessCaseTypes.slice(0, 2).map((type) => (
-                            <span key={type} className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                            <span
+                              key={type}
+                              className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800"
+                            >
                               {type}
                             </span>
                           ))}
@@ -639,42 +784,58 @@ const ApprovalTimeTracker: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        {expandedRequest === request.requestId ? 
-                          <ChevronUp className="w-4 h-4 text-gray-400" /> : 
+                        {expandedRequest === request.requestId ? (
+                          <ChevronUp className="w-4 h-4 text-gray-400" />
+                        ) : (
                           <ChevronDown className="w-4 h-4 text-gray-400" />
-                        }
+                        )}
                       </div>
                     </button>
-                    
+
                     {expandedRequest === request.requestId && (
                       <div className="px-4 pb-4 border-t border-gray-200 bg-gray-50">
                         <div className="mt-4">
-                          <h6 className="text-sm font-medium text-gray-900 mb-3">Level Processing Times</h6>
+                          <h6 className="text-sm font-medium text-gray-900 mb-3">
+                            Level Processing Times
+                          </h6>
                           <div className="space-y-2">
                             {request.levelTimes.map((levelTime, index) => {
                               const statusColor = {
                                 fast: 'bg-green-100 text-green-800',
                                 average: 'bg-blue-100 text-blue-800',
-                                slow: 'bg-red-100 text-red-800'
+                                slow: 'bg-red-100 text-red-800',
                               }[levelTime.status];
-                              
+
                               return (
-                                <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg">
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between p-3 bg-white rounded-lg"
+                                >
                                   <div className="flex items-center">
                                     <div className="flex items-center justify-center w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg mr-3">
-                                      <span className="text-sm font-bold">{levelTime.level}</span>
+                                      <span className="text-sm font-bold">
+                                        {levelTime.level}
+                                      </span>
                                     </div>
-                                    <span className="text-sm font-medium text-gray-900">Level {levelTime.level}</span>
+                                    <span className="text-sm font-medium text-gray-900">
+                                      Level {levelTime.level}
+                                    </span>
                                     {levelTime.bottleneck && (
                                       <div className="ml-2 flex items-center text-red-600">
                                         <AlertTriangle className="w-4 h-4 mr-1" />
-                                        <span className="text-xs font-medium">Bottleneck</span>
+                                        <span className="text-xs font-medium">
+                                          Bottleneck
+                                        </span>
                                       </div>
                                     )}
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium text-gray-900">{levelTime.time} days</span>
-                                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColor}`}>
+                                    <span className="text-sm font-medium text-gray-900">
+                                      {levelTime.time} days
+                                    </span>
+                                    <span
+                                      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColor}`}
+                                    >
                                       {levelTime.status}
                                     </span>
                                   </div>

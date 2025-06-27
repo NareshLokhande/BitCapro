@@ -15,7 +15,8 @@ export interface NotificationData {
     | 'approval_action'
     | 'request_submitted'
     | 'request_completed'
-    | 'delay_alert';
+    | 'delay_alert'
+    | 'rejection_notification';
   requestId: string;
   projectTitle: string;
   amount: number;
@@ -29,6 +30,11 @@ export interface NotificationData {
   delayDays?: number;
   businessCaseTypes?: string[];
   urgency?: 'low' | 'medium' | 'high' | 'critical';
+  rejectedBy?: string;
+  rejectedByRole?: string;
+  nextApproverName?: string;
+  nextApproverEmail?: string;
+  nextApproverRole?: string;
 }
 
 export interface SlackMessage {
@@ -49,6 +55,182 @@ export class NotificationService {
 
   static initialize(config: NotificationConfig) {
     this.config = config;
+  }
+
+  // Initialize with default configuration for development
+  static initializeDefault() {
+    this.config = {
+      slackWebhookUrl: import.meta.env.VITE_SLACK_WEBHOOK_URL,
+      emailService: 'sendgrid',
+      emailApiKey: import.meta.env.VITE_SENDGRID_API_KEY,
+      emailFrom: import.meta.env.VITE_EMAIL_FROM || 'noreply@approvia.com',
+      emailDomain: import.meta.env.VITE_EMAIL_DOMAIN,
+    };
+  }
+
+  // Find the next approver in the hierarchy for a given request
+  static async findNextApprover(
+    requestId: string,
+    currentLevel: number,
+    department: string,
+    amount: number,
+  ): Promise<{
+    name: string;
+    email: string;
+    role: string;
+    level: number;
+  } | null> {
+    try {
+      // Import supabase here to avoid circular dependencies
+      const { supabase } = await import('./supabase');
+
+      // Find the next approval level
+      const { data: nextLevelRule } = await supabase
+        .from('approval_matrix')
+        .select('*')
+        .gt('level', currentLevel)
+        .eq('active', true)
+        .or(`department.eq.All,department.eq.${department}`)
+        .gte('amount_min', amount)
+        .lte('amount_max', amount)
+        .order('level', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (!nextLevelRule) {
+        return null; // No next level found
+      }
+
+      // Find a user with the required role
+      const { data: nextApprover } = await supabase
+        .from('user_profiles')
+        .select('name, email, role')
+        .eq('role', nextLevelRule.role)
+        .eq('active', true)
+        .limit(1)
+        .single();
+
+      if (!nextApprover) {
+        return null; // No user found with the required role
+      }
+
+      return {
+        name: nextApprover.name,
+        email: nextApprover.email,
+        role: nextApprover.role,
+        level: nextLevelRule.level,
+      };
+    } catch (error) {
+      console.error('Error finding next approver:', error);
+      return null;
+    }
+  }
+
+  // Send rejection notification to next approver in hierarchy
+  static async sendRejectionNotification(
+    request: {
+      id: string;
+      project_title: string;
+      capex: number;
+      opex: number;
+      currency: string;
+      department: string;
+      submitted_by: string;
+    },
+    rejectedBy: {
+      name: string;
+      role: string;
+    },
+    rejectionComments: string,
+    currentLevel: number,
+  ): Promise<boolean> {
+    try {
+      const totalAmount = request.capex + request.opex;
+
+      // Find next approver in hierarchy
+      const nextApprover = await this.findNextApprover(
+        request.id,
+        currentLevel,
+        request.department,
+        totalAmount,
+      );
+
+      if (!nextApprover) {
+        console.log(
+          'No next approver found in hierarchy for rejection notification',
+        );
+        return false;
+      }
+
+      // Send notification to next approver
+      const notificationData: NotificationData = {
+        type: 'rejection_notification',
+        requestId: request.id,
+        projectTitle: request.project_title,
+        amount: totalAmount,
+        currency: request.currency,
+        requesterName: request.submitted_by,
+        requesterEmail: '', // Will be filled if needed
+        rejectedBy: rejectedBy.name,
+        rejectedByRole: rejectedBy.role,
+        nextApproverName: nextApprover.name,
+        nextApproverEmail: nextApprover.email,
+        nextApproverRole: nextApprover.role,
+        comments: rejectionComments,
+        urgency: 'high',
+      };
+
+      return await this.sendNotification(notificationData);
+    } catch (error) {
+      console.error('Error sending rejection notification:', error);
+      return false;
+    }
+  }
+
+  // Send rejection notification to requester
+  static async sendRejectionNotificationToRequester(
+    request: {
+      id: string;
+      project_title: string;
+      capex: number;
+      opex: number;
+      currency: string;
+      submitted_by: string;
+    },
+    rejectedBy: {
+      name: string;
+      role: string;
+    },
+    rejectionComments: string,
+    requesterEmail: string,
+  ): Promise<boolean> {
+    try {
+      const totalAmount = request.capex + request.opex;
+
+      // Send notification to requester
+      const notificationData: NotificationData = {
+        type: 'approval_action',
+        requestId: request.id,
+        projectTitle: request.project_title,
+        amount: totalAmount,
+        currency: request.currency,
+        requesterName: request.submitted_by,
+        requesterEmail: requesterEmail,
+        approverName: rejectedBy.name,
+        approverEmail: '', // Not needed for requester notification
+        action: 'rejected',
+        comments: rejectionComments,
+        urgency: 'high',
+      };
+
+      return await this.sendNotification(notificationData);
+    } catch (error) {
+      console.error(
+        'Error sending rejection notification to requester:',
+        error,
+      );
+      return false;
+    }
   }
 
   // Send notification based on type
@@ -334,6 +516,84 @@ export class NotificationService {
           ],
         };
 
+      case 'rejection_notification':
+        return {
+          text: `❌ Request Rejected: ${data.projectTitle} - Next approver notification`,
+          blocks: [
+            {
+              type: 'header',
+              text: {
+                type: 'plain_text',
+                text: '❌ Investment Request Rejected - Hierarchy Notification',
+                emoji: true,
+              },
+            },
+            {
+              type: 'section',
+              fields: [
+                {
+                  type: 'mrkdwn',
+                  text: `*Project:*\n${data.projectTitle}`,
+                },
+                {
+                  type: 'mrkdwn',
+                  text: `*Amount:*\n${
+                    data.currency
+                  } ${data.amount.toLocaleString()}`,
+                },
+                {
+                  type: 'mrkdwn',
+                  text: `*Rejected By:*\n${data.rejectedBy} (${data.rejectedByRole})`,
+                },
+                {
+                  type: 'mrkdwn',
+                  text: `*Next Approver:*\n${data.nextApproverName} (${data.nextApproverRole})`,
+                },
+              ],
+            },
+            ...(data.comments
+              ? [
+                  {
+                    type: 'section',
+                    text: {
+                      type: 'mrkdwn',
+                      text: `*Rejection Reason:*\n${data.comments}`,
+                    },
+                  },
+                ]
+              : []),
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `*Action Required:* As the next approver in the hierarchy, please review this rejected request and take appropriate action.`,
+              },
+            },
+            {
+              type: 'actions',
+              elements: [
+                {
+                  type: 'button',
+                  text: {
+                    type: 'plain_text',
+                    text: 'Review Request',
+                    emoji: true,
+                  },
+                  style: 'primary',
+                  url: `${window.location.origin}/app/tracker?request=${data.requestId}`,
+                },
+              ],
+            },
+          ],
+          attachments: [
+            {
+              color: '#ff6b6b',
+              footer: 'Approvia Investment Management',
+              ts: Math.floor(Date.now() / 1000),
+            },
+          ],
+        };
+
       default:
         return {
           text: `Investment Request Update: ${data.projectTitle}`,
@@ -441,6 +701,84 @@ export class NotificationService {
                     Review Now
                   </a>
                 </div>
+              </div>
+            </div>
+          `,
+        };
+
+      case 'rejection_notification':
+        return {
+          to: data.nextApproverEmail || '',
+          subject: `❌ Request Rejected: ${data.projectTitle} - Hierarchy Notification`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background: linear-gradient(135deg, #ff6b6b 0%, #c44569 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+                <h1 style="margin: 0;">❌ Investment Request Rejected - Hierarchy Notification</h1>
+              </div>
+              <div style="padding: 20px; border: 1px solid #ddd; border-radius: 0 0 8px 8px;">
+                <h2 style="color: #ff6b6b;">${data.projectTitle}</h2>
+                <div style="background: #ffe6e6; border: 1px solid #ffb3b3; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                  <strong>❌ This request has been rejected by ${
+                    data.rejectedBy
+                  } (${data.rejectedByRole})</strong>
+                  <p style="margin: 10px 0 0 0; color: #cc0000;">
+                    As the next approver in the hierarchy, your review is required.
+                  </p>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                  <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Amount:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">${
+                      data.currency
+                    } ${data.amount.toLocaleString()}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Rejected By:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">${
+                      data.rejectedBy
+                    } (${data.rejectedByRole})</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Next Approver:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">${
+                      data.nextApproverName
+                    } (${data.nextApproverRole})</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Requester:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">${
+                      data.requesterName
+                    }</td>
+                  </tr>
+                </table>
+                ${
+                  data.comments
+                    ? `
+                <div style="background: #f8f9fa; border-left: 4px solid #ff6b6b; padding: 15px; margin: 20px 0;">
+                  <strong>Rejection Reason:</strong>
+                  <p style="margin: 10px 0 0 0; color: #666;">${data.comments}</p>
+                </div>
+                `
+                    : ''
+                }
+                <div style="background: #e3f2fd; border: 1px solid #bbdefb; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                  <strong>Action Required:</strong>
+                  <p style="margin: 10px 0 0 0; color: #1976d2;">
+                    As the next approver in the hierarchy, please review this rejected request and take appropriate action. 
+                    You may choose to override the rejection, request additional information, or uphold the rejection.
+                  </p>
+                </div>
+                <div style="text-align: center; margin: 20px 0;">
+                  <a href="${window.location.origin}/app/tracker?request=${
+            data.requestId
+          }" 
+                     style="background: #ff6b6b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                    Review Request
+                  </a>
+                </div>
+                <p style="color: #666; font-size: 12px;">
+                  This is an automated notification from Approvia Investment Management System.
+                </p>
               </div>
             </div>
           `,

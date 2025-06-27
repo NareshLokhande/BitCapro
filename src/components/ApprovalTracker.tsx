@@ -1,38 +1,44 @@
-import React, { useState } from 'react';
-import { 
-  Search, 
-  Filter, 
-  Eye,
-  CheckCircle,
-  XCircle,
-  Clock,
+import {
   AlertCircle,
-  Calendar,
-  User,
-  DollarSign,
-  Building,
-  MapPin,
-  Target,
-  TrendingUp,
-  FileText,
-  ThumbsUp,
-  ThumbsDown,
-  Pause,
-  MessageSquare,
-  Shield,
-  ArrowRight,
-  Users,
   Brain,
-  Sparkles
+  Building,
+  Calendar,
+  CheckCircle,
+  Clock,
+  Eye,
+  FileText,
+  Filter,
+  MapPin,
+  Pause,
+  Search,
+  Shield,
+  Target,
+  ThumbsDown,
+  ThumbsUp,
+  User,
+  XCircle,
 } from 'lucide-react';
-import { useInvestmentRequests, useApprovalLogs, useKPIs, useApprovalMatrix } from '../hooks/useSupabase';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { formatCurrency, getCurrencySymbol } from '../lib/supabase';
+import {
+  useApprovalLogs,
+  useApprovalMatrix,
+  useInvestmentRequests,
+  useKPIs,
+} from '../hooks/useSupabase';
+import { NotificationService } from '../lib/notifications';
+import { formatCurrency, InvestmentRequest } from '../lib/supabase';
 import AIInsights from './AIInsights';
 
+import StyledDropdown from './StyledDropdown';
+
 const ApprovalTracker: React.FC = () => {
-  const { requests, loading: requestsLoading, updateRequest } = useInvestmentRequests();
-  const { logs, loading: logsLoading, addLog } = useApprovalLogs();
+  const {
+    requests,
+    loading: requestsLoading,
+    updateRequest,
+  } = useInvestmentRequests();
+  const { logs, loading: logsLoading, addLog, updateLog } = useApprovalLogs();
   const { kpis, loading: kpisLoading } = useKPIs();
   const { matrix, loading: matrixLoading } = useApprovalMatrix();
   const { profile, user } = useAuth();
@@ -41,9 +47,16 @@ const ApprovalTracker: React.FC = () => {
   const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showAIInsights, setShowAIInsights] = useState(false);
-  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject' | 'hold'>('approve');
+  const [approvalAction, setApprovalAction] = useState<
+    'approve' | 'reject' | 'hold'
+  >('approve');
   const [comments, setComments] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [processingRequests, setProcessingRequests] = useState<Set<string>>(
+    new Set(),
+  );
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   if (requestsLoading || logsLoading || kpisLoading || matrixLoading) {
     return (
@@ -66,40 +79,42 @@ const ApprovalTracker: React.FC = () => {
   // Get approval matrix rules for user
   const getUserApprovalRules = () => {
     if (!profile || !matrix) return [];
-    return matrix.filter(rule => 
-      rule.role === profile.role && 
-      rule.active &&
-      (rule.department === 'All' || rule.department === profile.department)
+    return matrix.filter(
+      (rule) =>
+        rule.role === profile.role &&
+        rule.active &&
+        (rule.department === 'All' || rule.department === profile.department),
     );
   };
 
   const userApprovalRules = getUserApprovalRules();
 
   // Check if user can approve a specific request
-  const canUserApprove = (request: any) => {
+  const canUserApprove = (request: InvestmentRequest) => {
     if (!profile || !userLevel) return false;
-    
+
     // Admin can approve anything
     if (profile.role === 'Admin') return true;
-    
+
     // Check if request is at the user's approval level
     const expectedStatus = `Pending - Level ${userLevel}`;
-    if (request.status !== expectedStatus && request.status !== 'Submitted') return false;
-    
+    if (request.status !== expectedStatus && request.status !== 'Submitted')
+      return false;
+
     // Check amount limits using base currency (USD)
-    const totalAmount = request.base_currency_capex + request.base_currency_opex;
-    return userApprovalRules.some(rule => 
-      totalAmount >= rule.amount_min && 
-      totalAmount <= rule.amount_max
+    const totalAmount =
+      request.base_currency_capex + request.base_currency_opex;
+    return userApprovalRules.some(
+      (rule) =>
+        totalAmount >= rule.amount_min && totalAmount <= rule.amount_max,
     );
   };
 
   // Get next approval level
   const getNextApprovalLevel = (currentLevel: number) => {
     const nextLevel = currentLevel + 1;
-    const nextLevelRule = matrix.find(rule => 
-      rule.level === nextLevel && 
-      rule.active
+    const nextLevelRule = matrix.find(
+      (rule) => rule.level === nextLevel && rule.active,
     );
     return nextLevelRule ? nextLevel : null;
   };
@@ -110,36 +125,38 @@ const ApprovalTracker: React.FC = () => {
 
     // Filter by user's approval permissions
     if (profile?.role !== 'Admin') {
-      filtered = requests.filter(request => {
+      filtered = requests.filter((request) => {
         // Show requests user submitted
         if (request.user_id === user?.id) return true;
-        
+
         // Show requests user can approve
         if (canUserApprove(request)) return true;
-        
+
         // Show requests user has already acted on
-        const userLogs = logs.filter(log => 
-          log.request_id === request.id && 
-          log.user_id === user?.id
+        const userLogs = logs.filter(
+          (log) => log.request_id === request.id && log.user_id === user?.id,
         );
         if (userLogs.length > 0) return true;
-        
+
         return false;
       });
     }
 
     // Apply search filter
     if (searchTerm) {
-      filtered = filtered.filter(request => 
-        request.project_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        request.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        request.submitted_by.toLowerCase().includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(
+        (request) =>
+          request.project_title
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          request.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          request.submitted_by.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
     // Apply status filter
     if (statusFilter !== 'All') {
-      filtered = filtered.filter(request => request.status === statusFilter);
+      filtered = filtered.filter((request) => request.status === statusFilter);
     }
 
     return filtered;
@@ -227,30 +244,72 @@ const ApprovalTracker: React.FC = () => {
 
   const handleApprovalAction = async () => {
     if (!selectedRequest || !profile || !user) return;
-    
+
+    // Check if this request is already being processed
+    if (processingRequests.has(selectedRequest)) {
+      setErrorMessage(
+        'This request is already being processed. Please wait...',
+      );
+      return;
+    }
+
+    // Add request to processing set
+    setProcessingRequests((prev) => new Set(prev).add(selectedRequest));
     setIsSubmitting(true);
+    setErrorMessage(null);
+
     try {
-      const request = requests.find(r => r.id === selectedRequest);
+      const request = requests.find((r) => r.id === selectedRequest);
       if (!request) return;
 
-      // Create approval log entry
+      // Check if user has already acted on this request
+      const existingLog = logs.find(
+        (log) => log.request_id === selectedRequest && log.user_id === user.id,
+      );
+
       const logData = {
         request_id: selectedRequest,
         approved_by: profile.name,
         role: profile.role,
         level: userLevel || 0,
-        status: approvalAction === 'approve' ? 'Approved' : 
-                approvalAction === 'reject' ? 'Rejected' : 'On Hold',
+        status:
+          approvalAction === 'approve'
+            ? 'Approved'
+            : approvalAction === 'reject'
+            ? 'Rejected'
+            : 'On Hold',
         comments: comments || null,
         timestamp: new Date().toISOString(),
-        user_id: user.id
+        user_id: user.id,
       };
 
-      await addLog(logData);
+      if (existingLog) {
+        // Update existing log entry
+        console.log('Updating existing approval log:', existingLog.id);
+        await updateLog(existingLog.id, logData);
+      } else {
+        // Create new log entry with duplicate prevention
+        console.log('Creating new approval log');
+        try {
+          await addLog(logData);
+        } catch (error) {
+          // Handle duplicate submission error
+          if (
+            error instanceof Error &&
+            error.message.includes('already acted')
+          ) {
+            setErrorMessage(
+              'You have already acted on this request. Please refresh the page to see your previous decision.',
+            );
+            return;
+          }
+          throw error; // Re-throw other errors
+        }
+      }
 
       // Update request status
       let newStatus = request.status;
-      
+
       if (approvalAction === 'approve') {
         const nextLevel = getNextApprovalLevel(userLevel || 0);
         if (nextLevel) {
@@ -264,56 +323,197 @@ const ApprovalTracker: React.FC = () => {
         newStatus = 'On Hold';
       }
 
-      await updateRequest(selectedRequest, { 
+      await updateRequest(selectedRequest, {
         status: newStatus,
-        last_updated: new Date().toISOString()
+        last_updated: new Date().toISOString(),
       });
 
       // Reset modal state
       setShowApprovalModal(false);
       setComments('');
       setApprovalAction('approve');
-      
+
+      // Send rejection notification if rejected
+      if (approvalAction === 'reject' && comments.trim()) {
+        try {
+          await NotificationService.sendRejectionNotification(
+            request,
+            {
+              name: profile.name,
+              role: profile.role,
+            },
+            comments,
+            userLevel || 0,
+          );
+          console.log('Rejection notification sent successfully');
+        } catch (error) {
+          console.error('Error sending rejection notification:', error);
+        }
+      }
+
+      // Show success message
+      setSuccessMessage(
+        `Request ${
+          approvalAction === 'approve'
+            ? 'approved'
+            : approvalAction === 'reject'
+            ? 'rejected'
+            : 'put on hold'
+        } successfully!`,
+      );
+
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (error) {
       console.error('Error processing approval:', error);
+
+      // Show user-friendly error message
+      if (error instanceof Error) {
+        setErrorMessage(`Error: ${error.message}`);
+      } else {
+        setErrorMessage('An unexpected error occurred. Please try again.');
+      }
     } finally {
+      // Remove request from processing set
+      setProcessingRequests((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(selectedRequest);
+        return newSet;
+      });
       setIsSubmitting(false);
     }
   };
 
-  const selectedRequestData = selectedRequest ? 
-    requests.find(r => r.id === selectedRequest) : null;
-  
-  const relatedLogs = selectedRequest ? 
-    logs.filter(log => log.request_id === selectedRequest) : [];
+  const selectedRequestData = selectedRequest
+    ? requests.find((r) => r.id === selectedRequest)
+    : null;
 
-  const requestKPIs = selectedRequest ? 
-    kpis.filter(kpi => kpi.request_id === selectedRequest) : [];
+  const relatedLogs = selectedRequest
+    ? logs.filter((log) => log.request_id === selectedRequest)
+    : [];
+
+  const requestKPIs = selectedRequest
+    ? kpis.filter((kpi) => kpi.request_id === selectedRequest)
+    : [];
 
   const hasUserActedOnRequest = (requestId: string) => {
-    return logs.some(log => 
-      log.request_id === requestId && 
-      log.user_id === user?.id
+    return logs.some(
+      (log) => log.request_id === requestId && log.user_id === user?.id,
     );
   };
 
-  const showAIInsightsForRequest = (request: any) => {
+  // Check if user can update their decision (for requests that are still pending at their level)
+  const canUserUpdateDecision = (request: InvestmentRequest) => {
+    if (!profile || !userLevel) return false;
+
+    // Admin can always update decisions
+    if (profile.role === 'Admin') return true;
+
+    // Check if request is still at the user's approval level
+    const expectedStatus = `Pending - Level ${userLevel}`;
+    if (request.status !== expectedStatus) return false;
+
+    // Check if user has already acted on this request
+    const userLogs = logs.filter(
+      (log) => log.request_id === request.id && log.user_id === user?.id,
+    );
+
+    // If user has acted, they can update their decision if the request is still at their level
+    return userLogs.length > 0;
+  };
+
+  // Check if user can take action (either initial action or update)
+  const canUserTakeAction = (request: InvestmentRequest) => {
+    return canUserApprove(request) || canUserUpdateDecision(request);
+  };
+
+  const showAIInsightsForRequest = (request: InvestmentRequest) => {
     setSelectedRequest(request.id);
     setShowAIInsights(true);
   };
 
+  // Pre-populate form when opening modal for decision update
+  const openApprovalModal = (requestId: string) => {
+    setSelectedRequest(requestId);
+
+    // Check if user has already acted on this request
+    const existingLog = logs.find(
+      (log) => log.request_id === requestId && log.user_id === user?.id,
+    );
+
+    if (existingLog) {
+      // Pre-populate with existing decision
+      setApprovalAction(
+        existingLog.status === 'Approved'
+          ? 'approve'
+          : existingLog.status === 'Rejected'
+          ? 'reject'
+          : 'hold',
+      );
+      setComments(existingLog.comments || '');
+    } else {
+      // Reset to defaults for new decision
+      setApprovalAction('approve');
+      setComments('');
+    }
+
+    setShowApprovalModal(true);
+  };
+
   return (
     <div className="space-y-8">
+      {/* Global Notifications */}
+      {(errorMessage || successMessage) && (
+        <div className="fixed top-4 right-4 z-50 max-w-md">
+          {errorMessage && (
+            <div className="mb-2 p-4 bg-red-50 border border-red-200 rounded-lg shadow-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <AlertCircle className="w-4 h-4 text-red-600 mr-2" />
+                  <p className="text-sm text-red-700">{errorMessage}</p>
+                </div>
+                <button
+                  onClick={() => setErrorMessage(null)}
+                  className="text-red-400 hover:text-red-600"
+                >
+                  <XCircle className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+          {successMessage && (
+            <div className="mb-2 p-4 bg-green-50 border border-green-200 rounded-lg shadow-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
+                  <p className="text-sm text-green-700">{successMessage}</p>
+                </div>
+                <button
+                  onClick={() => setSuccessMessage(null)}
+                  className="text-green-400 hover:text-green-600"
+                >
+                  <XCircle className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-700 rounded-2xl p-8 text-white">
         <h1 className="text-3xl font-bold mb-2">Approval Tracker</h1>
-        <p className="text-indigo-100">Monitor and approve investment requests with AI-powered insights</p>
+        <p className="text-indigo-100">
+          Monitor and approve investment requests with AI-powered insights
+        </p>
         {profile && (
           <div className="mt-4 flex items-center">
             <Shield className="w-5 h-5 mr-2" />
             <span className="font-semibold">{profile.role}</span>
             {userLevel && (
-              <span className="ml-2 text-indigo-200">• Level {userLevel} Approver</span>
+              <span className="ml-2 text-indigo-200">
+                • Level {userLevel} Approver
+              </span>
             )}
           </div>
         )}
@@ -324,7 +524,9 @@ const ApprovalTracker: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900">AI Insights for {selectedRequestData.project_title}</h3>
+              <h3 className="text-xl font-semibold text-gray-900">
+                AI Insights for {selectedRequestData.project_title}
+              </h3>
               <button
                 onClick={() => setShowAIInsights(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -359,10 +561,10 @@ const ApprovalTracker: React.FC = () => {
               />
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Filter className="w-5 h-5 text-gray-500" />
-            <select
+            <StyledDropdown
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
@@ -378,7 +580,7 @@ const ApprovalTracker: React.FC = () => {
               <option value="Approved">Approved</option>
               <option value="Rejected">Rejected</option>
               <option value="On Hold">On Hold</option>
-            </select>
+            </StyledDropdown>
           </div>
         </div>
       </div>
@@ -387,15 +589,19 @@ const ApprovalTracker: React.FC = () => {
         {/* Request List */}
         <div className="lg:col-span-2 space-y-4">
           {filteredRequests.map((request) => {
-            const canApprove = canUserApprove(request);
+            // const canApprove = canUserApprove(request);
+            // const canUpdate = canUserUpdateDecision(request);
+            const canTakeAction = canUserTakeAction(request);
             const hasActed = hasUserActedOnRequest(request.id);
             const isOwner = request.user_id === user?.id;
-            
+
             return (
               <div
                 key={request.id}
                 className={`bg-white rounded-xl shadow-sm border-2 transition-all cursor-pointer hover:shadow-md ${
-                  selectedRequest === request.id ? 'border-blue-500 shadow-md' : 'border-gray-100'
+                  selectedRequest === request.id
+                    ? 'border-blue-500 shadow-md'
+                    : 'border-gray-100'
                 }`}
                 onClick={() => setSelectedRequest(request.id)}
               >
@@ -404,10 +610,17 @@ const ApprovalTracker: React.FC = () => {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         {getStatusIcon(request.status)}
-                        <h3 className="text-lg font-semibold text-gray-900">{request.project_title}</h3>
-                        {canApprove && !hasActed && (
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {request.project_title}
+                        </h3>
+                        {canTakeAction && !hasActed && (
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                             Action Required
+                          </span>
+                        )}
+                        {canTakeAction && hasActed && (
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                            Update Decision
                           </span>
                         )}
                         {isOwner && (
@@ -416,18 +629,30 @@ const ApprovalTracker: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-600 mb-2">{request.department} • {request.category}</p>
-                      <p className="text-sm text-gray-700 line-clamp-2">{request.description}</p>
+                      <p className="text-sm text-gray-600 mb-2">
+                        {request.department} • {request.category}
+                      </p>
+                      <p className="text-sm text-gray-700 line-clamp-2">
+                        {request.description}
+                      </p>
                     </div>
-                    
+
                     <div className="text-right ml-4">
                       <div className="text-lg font-bold text-gray-900">
-                        {formatCurrency(request.capex + request.opex, request.currency)}
+                        {formatCurrency(
+                          request.capex + request.opex,
+                          request.currency,
+                        )}
                       </div>
                       <div className="text-sm text-gray-500">Total Cost</div>
                       {request.currency !== 'USD' && (
                         <div className="text-xs text-gray-400">
-                          ≈ ${(request.base_currency_capex + request.base_currency_opex).toLocaleString()} USD
+                          ≈ $
+                          {(
+                            request.base_currency_capex +
+                            request.base_currency_opex
+                          ).toLocaleString()}{' '}
+                          USD
                         </div>
                       )}
                     </div>
@@ -446,22 +671,34 @@ const ApprovalTracker: React.FC = () => {
 
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-4">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(request.priority)}`}>
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(
+                          request.priority,
+                        )}`}
+                      >
                         {request.priority}
                       </span>
-                      <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full border ${getStatusColor(request.status)}`}>
+                      <span
+                        className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full border ${getStatusColor(
+                          request.status,
+                        )}`}
+                      >
                         {request.status}
                       </span>
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        request.is_in_budget ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          request.is_in_budget
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
                         {request.is_in_budget ? 'In Budget' : 'Out of Budget'}
                       </span>
                       <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                         {request.currency}
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center text-sm text-gray-500">
                       <User className="w-4 h-4 mr-1" />
                       {request.submitted_by}
@@ -475,13 +712,17 @@ const ApprovalTracker: React.FC = () => {
                       <span>{getProgressPercentage(request.status)}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
+                      <div
                         className={`h-2 rounded-full transition-all ${
-                          request.status === 'Approved' ? 'bg-green-500' :
-                          request.status === 'Rejected' ? 'bg-red-500' :
-                          'bg-blue-500'
+                          request.status === 'Approved'
+                            ? 'bg-green-500'
+                            : request.status === 'Rejected'
+                            ? 'bg-red-500'
+                            : 'bg-blue-500'
                         }`}
-                        style={{ width: `${getProgressPercentage(request.status)}%` }}
+                        style={{
+                          width: `${getProgressPercentage(request.status)}%`,
+                        }}
                       />
                     </div>
                   </div>
@@ -497,7 +738,7 @@ const ApprovalTracker: React.FC = () => {
                         {request.purpose}
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       <button
                         onClick={(e) => {
@@ -509,17 +750,30 @@ const ApprovalTracker: React.FC = () => {
                         <Brain className="w-3 h-3 mr-1" />
                         AI Insights
                       </button>
-                      {canApprove && !hasActed && (
+                      {canTakeAction && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedRequest(request.id);
-                            setShowApprovalModal(true);
+                            openApprovalModal(request.id);
                           }}
-                          className="flex items-center px-3 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors"
+                          disabled={processingRequests.has(request.id)}
+                          className={`flex items-center px-3 py-1 text-white text-xs rounded-lg transition-colors ${
+                            processingRequests.has(request.id)
+                              ? 'bg-gray-400 cursor-not-allowed'
+                              : 'bg-green-600 hover:bg-green-700'
+                          }`}
                         >
-                          <ThumbsUp className="w-3 h-3 mr-1" />
-                          Approve/Reject
+                          {processingRequests.has(request.id) ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <ThumbsUp className="w-3 h-3 mr-1" />
+                              {hasActed ? 'Update Decision' : 'Approve/Reject'}
+                            </>
+                          )}
                         </button>
                       )}
                       <button className="text-blue-600 hover:text-blue-800 flex items-center transition-colors">
@@ -532,7 +786,7 @@ const ApprovalTracker: React.FC = () => {
               </div>
             );
           })}
-          
+
           {filteredRequests.length === 0 && (
             <div className="text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-100">
               <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
@@ -546,169 +800,311 @@ const ApprovalTracker: React.FC = () => {
           {selectedRequestData ? (
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Request Details</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Request Details
+                </h3>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => showAIInsightsForRequest(selectedRequestData)}
+                    onClick={() =>
+                      showAIInsightsForRequest(selectedRequestData)
+                    }
                     className="flex items-center px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-colors"
                   >
                     <Brain className="w-4 h-4 mr-2" />
                     AI Insights
                   </button>
-                  {canUserApprove(selectedRequestData) && !hasUserActedOnRequest(selectedRequestData.id) && (
+                  {canUserTakeAction(selectedRequestData) && (
                     <button
-                      onClick={() => setShowApprovalModal(true)}
-                      className="flex items-center px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
+                      onClick={() => openApprovalModal(selectedRequestData.id)}
+                      disabled={processingRequests.has(selectedRequestData.id)}
+                      className={`flex items-center px-4 py-2 text-white rounded-xl transition-colors ${
+                        processingRequests.has(selectedRequestData.id)
+                          ? 'bg-gray-400 cursor-not-allowed'
+                          : 'bg-green-600 hover:bg-green-700'
+                      }`}
                     >
-                      <ThumbsUp className="w-4 h-4 mr-2" />
-                      Take Action
+                      {processingRequests.has(selectedRequestData.id) ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <ThumbsUp className="w-4 h-4 mr-2" />
+                          {hasUserActedOnRequest(selectedRequestData.id)
+                            ? 'Update Decision'
+                            : 'Take Action'}
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Project Title</label>
-                  <p className="text-gray-900 font-medium">{selectedRequestData.project_title}</p>
+                  <label className="text-sm font-medium text-gray-600">
+                    Project Title
+                  </label>
+                  <p className="text-gray-900 font-medium">
+                    {selectedRequestData.project_title}
+                  </p>
                 </div>
-                
+
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Objective</label>
-                  <p className="text-gray-900">{selectedRequestData.objective}</p>
+                  <label className="text-sm font-medium text-gray-600">
+                    Objective
+                  </label>
+                  <p className="text-gray-900">
+                    {selectedRequestData.objective}
+                  </p>
                 </div>
-                
+
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Request ID</label>
-                  <p className="text-gray-900 font-mono text-sm">{selectedRequestData.id}</p>
+                  <label className="text-sm font-medium text-gray-600">
+                    Request ID
+                  </label>
+                  <p className="text-gray-900 font-mono text-sm">
+                    {selectedRequestData.id}
+                  </p>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">CapEx</label>
+                    <label className="text-sm font-medium text-gray-600">
+                      CapEx
+                    </label>
                     <p className="text-gray-900 font-semibold">
-                      {formatCurrency(selectedRequestData.capex, selectedRequestData.currency)}
+                      {formatCurrency(
+                        selectedRequestData.capex,
+                        selectedRequestData.currency,
+                      )}
                     </p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">OpEx</label>
+                    <label className="text-sm font-medium text-gray-600">
+                      OpEx
+                    </label>
                     <p className="text-gray-900 font-semibold">
-                      {formatCurrency(selectedRequestData.opex, selectedRequestData.currency)}
+                      {formatCurrency(
+                        selectedRequestData.opex,
+                        selectedRequestData.currency,
+                      )}
                     </p>
                   </div>
                 </div>
 
                 {selectedRequestData.currency !== 'USD' && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <label className="text-sm font-medium text-blue-700">USD Equivalent (for approval)</label>
+                    <label className="text-sm font-medium text-blue-700">
+                      USD Equivalent (for approval)
+                    </label>
                     <div className="grid grid-cols-2 gap-4 mt-1">
                       <div>
                         <p className="text-blue-900 font-semibold">
-                          ${selectedRequestData.base_currency_capex.toLocaleString()} CapEx
+                          $
+                          {selectedRequestData.base_currency_capex.toLocaleString()}{' '}
+                          CapEx
                         </p>
                       </div>
                       <div>
                         <p className="text-blue-900 font-semibold">
-                          ${selectedRequestData.base_currency_opex.toLocaleString()} OpEx
+                          $
+                          {selectedRequestData.base_currency_opex.toLocaleString()}{' '}
+                          OpEx
                         </p>
                       </div>
                     </div>
                     <p className="text-xs text-blue-600 mt-1">
-                      Exchange rate: 1 {selectedRequestData.currency} = {(1 / selectedRequestData.exchange_rate).toFixed(6)} USD
+                      Exchange rate: 1 {selectedRequestData.currency} ={' '}
+                      {(1 / selectedRequestData.exchange_rate).toFixed(6)} USD
                     </p>
                   </div>
                 )}
 
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Legal Entity</label>
-                  <p className="text-gray-900">{selectedRequestData.legal_entity}</p>
+                  <label className="text-sm font-medium text-gray-600">
+                    Legal Entity
+                  </label>
+                  <p className="text-gray-900">
+                    {selectedRequestData.legal_entity}
+                  </p>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Location</label>
-                  <p className="text-gray-900">{selectedRequestData.location}</p>
+                  <label className="text-sm font-medium text-gray-600">
+                    Location
+                  </label>
+                  <p className="text-gray-900">
+                    {selectedRequestData.location}
+                  </p>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Purpose</label>
+                  <label className="text-sm font-medium text-gray-600">
+                    Purpose
+                  </label>
                   <p className="text-gray-900">{selectedRequestData.purpose}</p>
                 </div>
-                
+
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Project Description</label>
-                  <p className="text-gray-900 text-sm">{selectedRequestData.description}</p>
+                  <label className="text-sm font-medium text-gray-600">
+                    Project Description
+                  </label>
+                  <p className="text-gray-900 text-sm">
+                    {selectedRequestData.description}
+                  </p>
                 </div>
 
                 {/* Business Case Types */}
-                {selectedRequestData.business_case_type && selectedRequestData.business_case_type.length > 0 && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Business Case Types</label>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {selectedRequestData.business_case_type.map((caseType) => (
-                        <span key={caseType} className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                          {caseType}
-                        </span>
-                      ))}
+                {selectedRequestData.business_case_type &&
+                  selectedRequestData.business_case_type.length > 0 && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">
+                        Business Case Types
+                      </label>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {selectedRequestData.business_case_type.map(
+                          (caseType) => (
+                            <span
+                              key={caseType}
+                              className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
+                            >
+                              {caseType}
+                            </span>
+                          ),
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Compliance Checklist */}
                 <div className="pt-4 border-t border-gray-200">
-                  <h4 className="text-md font-semibold text-gray-900 mb-3">Compliance Checklist</h4>
+                  <h4 className="text-md font-semibold text-gray-900 mb-3">
+                    Compliance Checklist
+                  </h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className={`flex items-center ${selectedRequestData.strategic_fit ? 'text-green-600' : 'text-red-600'}`}>
-                      {selectedRequestData.strategic_fit ? <CheckCircle className="w-4 h-4 mr-1" /> : <XCircle className="w-4 h-4 mr-1" />}
+                    <div
+                      className={`flex items-center ${
+                        selectedRequestData.strategic_fit
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                      }`}
+                    >
+                      {selectedRequestData.strategic_fit ? (
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                      ) : (
+                        <XCircle className="w-4 h-4 mr-1" />
+                      )}
                       Strategic Fit
                     </div>
-                    <div className={`flex items-center ${selectedRequestData.risk_assessment ? 'text-green-600' : 'text-red-600'}`}>
-                      {selectedRequestData.risk_assessment ? <CheckCircle className="w-4 h-4 mr-1" /> : <XCircle className="w-4 h-4 mr-1" />}
+                    <div
+                      className={`flex items-center ${
+                        selectedRequestData.risk_assessment
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                      }`}
+                    >
+                      {selectedRequestData.risk_assessment ? (
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                      ) : (
+                        <XCircle className="w-4 h-4 mr-1" />
+                      )}
                       Risk Assessment
                     </div>
-                    <div className={`flex items-center ${selectedRequestData.supply_plan ? 'text-green-600' : 'text-red-600'}`}>
-                      {selectedRequestData.supply_plan ? <CheckCircle className="w-4 h-4 mr-1" /> : <XCircle className="w-4 h-4 mr-1" />}
+                    <div
+                      className={`flex items-center ${
+                        selectedRequestData.supply_plan
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                      }`}
+                    >
+                      {selectedRequestData.supply_plan ? (
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                      ) : (
+                        <XCircle className="w-4 h-4 mr-1" />
+                      )}
                       Supply Plan
                     </div>
-                    <div className={`flex items-center ${selectedRequestData.legal_fit ? 'text-green-600' : 'text-red-600'}`}>
-                      {selectedRequestData.legal_fit ? <CheckCircle className="w-4 h-4 mr-1" /> : <XCircle className="w-4 h-4 mr-1" />}
+                    <div
+                      className={`flex items-center ${
+                        selectedRequestData.legal_fit
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                      }`}
+                    >
+                      {selectedRequestData.legal_fit ? (
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                      ) : (
+                        <XCircle className="w-4 h-4 mr-1" />
+                      )}
                       Legal Fit
                     </div>
-                    <div className={`flex items-center ${selectedRequestData.it_fit ? 'text-green-600' : 'text-red-600'}`}>
-                      {selectedRequestData.it_fit ? <CheckCircle className="w-4 h-4 mr-1" /> : <XCircle className="w-4 h-4 mr-1" />}
+                    <div
+                      className={`flex items-center ${
+                        selectedRequestData.it_fit
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                      }`}
+                    >
+                      {selectedRequestData.it_fit ? (
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                      ) : (
+                        <XCircle className="w-4 h-4 mr-1" />
+                      )}
                       IT Fit
                     </div>
-                    <div className={`flex items-center ${selectedRequestData.hsseq_compliance ? 'text-green-600' : 'text-red-600'}`}>
-                      {selectedRequestData.hsseq_compliance ? <CheckCircle className="w-4 h-4 mr-1" /> : <XCircle className="w-4 h-4 mr-1" />}
+                    <div
+                      className={`flex items-center ${
+                        selectedRequestData.hsseq_compliance
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                      }`}
+                    >
+                      {selectedRequestData.hsseq_compliance ? (
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                      ) : (
+                        <XCircle className="w-4 h-4 mr-1" />
+                      )}
                       HSSEQ Compliance
                     </div>
                   </div>
                 </div>
               </div>
-              
+
               {/* KPIs */}
               {requestKPIs.length > 0 && (
                 <div className="mt-6 pt-6 border-t border-gray-200">
-                  <h4 className="text-md font-semibold text-gray-900 mb-3">Key Performance Indicators</h4>
+                  <h4 className="text-md font-semibold text-gray-900 mb-3">
+                    Key Performance Indicators
+                  </h4>
                   <div className="space-y-3">
                     {requestKPIs.map((kpi) => (
                       <div key={kpi.id} className="bg-gray-50 rounded-lg p-4">
                         <div className="grid grid-cols-3 gap-4 text-sm">
                           <div>
                             <span className="text-gray-600">IRR:</span>
-                            <div className="font-semibold text-gray-900">{kpi.irr}%</div>
+                            <div className="font-semibold text-gray-900">
+                              {kpi.irr}%
+                            </div>
                           </div>
                           <div>
                             <span className="text-gray-600">NPV:</span>
-                            <div className="font-semibold text-gray-900">${kpi.npv.toLocaleString()}</div>
+                            <div className="font-semibold text-gray-900">
+                              ${kpi.npv.toLocaleString()}
+                            </div>
                           </div>
                           <div>
                             <span className="text-gray-600">Payback:</span>
-                            <div className="font-semibold text-gray-900">{kpi.payback_period} years</div>
+                            <div className="font-semibold text-gray-900">
+                              {kpi.payback_period} years
+                            </div>
                           </div>
                         </div>
                         {kpi.basis_of_calculation && (
                           <div className="mt-2 text-xs text-gray-600">
-                            <span className="font-medium">Basis:</span> {kpi.basis_of_calculation}
+                            <span className="font-medium">Basis:</span>{' '}
+                            {kpi.basis_of_calculation}
                           </div>
                         )}
                       </div>
@@ -716,31 +1112,52 @@ const ApprovalTracker: React.FC = () => {
                   </div>
                 </div>
               )}
-              
+
               {/* Approval History */}
               {relatedLogs.length > 0 && (
                 <div className="mt-6 pt-6 border-t border-gray-200">
-                  <h4 className="text-md font-semibold text-gray-900 mb-3">Approval History</h4>
+                  <h4 className="text-md font-semibold text-gray-900 mb-3">
+                    Approval History
+                  </h4>
                   <div className="space-y-3">
                     {relatedLogs.map((log) => (
-                      <div key={log.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                      <div
+                        key={log.id}
+                        className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg"
+                      >
                         <div className="flex-shrink-0">
-                          {log.status === 'Approved' && <CheckCircle className="w-5 h-5 text-green-600" />}
-                          {log.status === 'Rejected' && <XCircle className="w-5 h-5 text-red-600" />}
-                          {log.status === 'Under Review' && <Clock className="w-5 h-5 text-blue-600" />}
-                          {log.status === 'On Hold' && <AlertCircle className="w-5 h-5 text-yellow-600" />}
+                          {log.status === 'Approved' && (
+                            <CheckCircle className="w-5 h-5 text-green-600" />
+                          )}
+                          {log.status === 'Rejected' && (
+                            <XCircle className="w-5 h-5 text-red-600" />
+                          )}
+                          {log.status === 'Under Review' && (
+                            <Clock className="w-5 h-5 text-blue-600" />
+                          )}
+                          {log.status === 'On Hold' && (
+                            <AlertCircle className="w-5 h-5 text-yellow-600" />
+                          )}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-gray-900">{log.approved_by}</p>
+                            <p className="text-sm font-medium text-gray-900">
+                              {log.approved_by}
+                            </p>
                             <p className="text-xs text-gray-500">
                               {new Date(log.timestamp).toLocaleDateString()}
                             </p>
                           </div>
-                          <p className="text-sm text-gray-700">{log.role} - Level {log.level}</p>
-                          <p className="text-sm font-medium text-gray-900">{log.status}</p>
+                          <p className="text-sm text-gray-700">
+                            {log.role} - Level {log.level}
+                          </p>
+                          <p className="text-sm font-medium text-gray-900">
+                            {log.status}
+                          </p>
                           {log.comments && (
-                            <p className="text-sm text-gray-600 mt-1">{log.comments}</p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {log.comments}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -763,23 +1180,38 @@ const ApprovalTracker: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Approval Action: {selectedRequestData.project_title}
+              {hasUserActedOnRequest(selectedRequestData.id)
+                ? 'Update Decision'
+                : 'Approval Action'}
+              : {selectedRequestData.project_title}
             </h3>
-            
+
             <div className="mb-6">
               <p className="text-sm text-gray-600 mb-2">
-                Total Amount: {formatCurrency(selectedRequestData.capex + selectedRequestData.opex, selectedRequestData.currency)}
+                Total Amount:{' '}
+                {formatCurrency(
+                  selectedRequestData.capex + selectedRequestData.opex,
+                  selectedRequestData.currency,
+                )}
               </p>
               {selectedRequestData.currency !== 'USD' && (
                 <p className="text-sm text-gray-600 mb-2">
-                  USD Equivalent: ${(selectedRequestData.base_currency_capex + selectedRequestData.base_currency_opex).toLocaleString()}
+                  USD Equivalent: $
+                  {(
+                    selectedRequestData.base_currency_capex +
+                    selectedRequestData.base_currency_opex
+                  ).toLocaleString()}
                 </p>
               )}
-              <p className="text-sm text-gray-600">Your Role: {profile?.role}</p>
+              <p className="text-sm text-gray-600">
+                Your Role: {profile?.role}
+              </p>
             </div>
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-3">Action</label>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Action
+              </label>
               <div className="space-y-2">
                 <label className="flex items-center">
                   <input
@@ -787,7 +1219,11 @@ const ApprovalTracker: React.FC = () => {
                     name="action"
                     value="approve"
                     checked={approvalAction === 'approve'}
-                    onChange={(e) => setApprovalAction(e.target.value as 'approve' | 'reject' | 'hold')}
+                    onChange={(e) =>
+                      setApprovalAction(
+                        e.target.value as 'approve' | 'reject' | 'hold',
+                      )
+                    }
                     className="mr-3"
                   />
                   <ThumbsUp className="w-4 h-4 mr-2 text-green-600" />
@@ -799,7 +1235,11 @@ const ApprovalTracker: React.FC = () => {
                     name="action"
                     value="reject"
                     checked={approvalAction === 'reject'}
-                    onChange={(e) => setApprovalAction(e.target.value as 'approve' | 'reject' | 'hold')}
+                    onChange={(e) =>
+                      setApprovalAction(
+                        e.target.value as 'approve' | 'reject' | 'hold',
+                      )
+                    }
                     className="mr-3"
                   />
                   <ThumbsDown className="w-4 h-4 mr-2 text-red-600" />
@@ -811,18 +1251,27 @@ const ApprovalTracker: React.FC = () => {
                     name="action"
                     value="hold"
                     checked={approvalAction === 'hold'}
-                    onChange={(e) => setApprovalAction(e.target.value as 'approve' | 'reject' | 'hold')}
+                    onChange={(e) =>
+                      setApprovalAction(
+                        e.target.value as 'approve' | 'reject' | 'hold',
+                      )
+                    }
                     className="mr-3"
                   />
                   <Pause className="w-4 h-4 mr-2 text-yellow-600" />
-                  <span className="text-yellow-700 font-medium">Put on Hold</span>
+                  <span className="text-yellow-700 font-medium">
+                    Put on Hold
+                  </span>
                 </label>
               </div>
             </div>
 
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Comments {approvalAction === 'reject' && <span className="text-red-500">*</span>}
+                Comments{' '}
+                {approvalAction === 'reject' && (
+                  <span className="text-red-500">*</span>
+                )}
               </label>
               <textarea
                 value={comments}
@@ -830,12 +1279,34 @@ const ApprovalTracker: React.FC = () => {
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={
-                  approvalAction === 'approve' ? 'Optional: Add approval comments...' :
-                  approvalAction === 'reject' ? 'Required: Explain reason for rejection...' :
-                  'Optional: Explain reason for hold...'
+                  approvalAction === 'approve'
+                    ? 'Optional: Add approval comments...'
+                    : approvalAction === 'reject'
+                    ? 'Required: Explain reason for rejection...'
+                    : 'Optional: Explain reason for hold...'
                 }
               />
             </div>
+
+            {/* Error Message Display */}
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center">
+                  <AlertCircle className="w-4 h-4 text-red-600 mr-2" />
+                  <p className="text-sm text-red-700">{errorMessage}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Success Message Display */}
+            {successMessage && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center">
+                  <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
+                  <p className="text-sm text-green-700">{successMessage}</p>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-3">
               <button
@@ -850,11 +1321,16 @@ const ApprovalTracker: React.FC = () => {
               </button>
               <button
                 onClick={handleApprovalAction}
-                disabled={isSubmitting || (approvalAction === 'reject' && !comments.trim())}
+                disabled={
+                  isSubmitting ||
+                  (approvalAction === 'reject' && !comments.trim())
+                }
                 className={`px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  approvalAction === 'approve' ? 'bg-green-600 hover:bg-green-700 text-white' :
-                  approvalAction === 'reject' ? 'bg-red-600 hover:bg-red-700 text-white' :
-                  'bg-yellow-600 hover:bg-yellow-700 text-white'
+                  approvalAction === 'approve'
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : approvalAction === 'reject'
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-yellow-600 hover:bg-yellow-700 text-white'
                 }`}
               >
                 {isSubmitting ? (
@@ -863,7 +1339,13 @@ const ApprovalTracker: React.FC = () => {
                     Processing...
                   </div>
                 ) : (
-                  `${approvalAction === 'approve' ? 'Approve' : approvalAction === 'reject' ? 'Reject' : 'Hold'} Request`
+                  `${
+                    approvalAction === 'approve'
+                      ? 'Approve'
+                      : approvalAction === 'reject'
+                      ? 'Reject'
+                      : 'Hold'
+                  } Request`
                 )}
               </button>
             </div>

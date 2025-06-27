@@ -1,56 +1,60 @@
-import React, { useState } from 'react';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign,
+import {
+  Activity,
+  AlertCircle,
+  BarChart3,
+  Building,
+  Building2,
   CheckCircle,
   Clock,
-  AlertCircle,
-  Building,
-  MapPin,
-  Calendar,
-  BarChart3,
-  PieChart,
-  Activity,
+  DollarSign,
   Filter,
-  Leaf,
-  Scale,
   Globe,
+  Leaf,
+  MapPin,
   Package,
-  Building2,
-  Timer
+  PieChart,
+  Scale,
+  Timer,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  PieChart as RechartsPieChart,
-  Cell,
-  Pie,
-  LineChart,
-  Line,
+import React, { useState } from 'react';
+import {
   Area,
   AreaChart,
-  Legend
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  Pie,
+  PieChart as RechartsPieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
 import { useInvestmentRequests, useKPIs } from '../hooks/useSupabase';
-import { formatCurrency, getCurrencySymbol, BUSINESS_CASE_TYPES } from '../lib/supabase';
-import { ESGCalculator, formatEmissions } from '../lib/esgCalculator';
+import {
+  CarbonFootprintData,
+  ESGCalculator,
+  formatEmissions,
+} from '../lib/esgCalculator';
+import { formatCurrency, getCurrencySymbol } from '../lib/supabase';
 import ApprovalTimeTracker from './ApprovalTimeTracker';
+import StyledDropdown from './StyledDropdown';
 
 const Dashboard: React.FC = () => {
   const { requests, loading: requestsLoading } = useInvestmentRequests();
   const { kpis, loading: kpisLoading } = useKPIs();
-  
+
   // Filter states
   const [businessCaseFilter, setBusinessCaseFilter] = useState('All');
   const [yearFilter, setYearFilter] = useState('All');
   const [departmentFilter, setDepartmentFilter] = useState('All');
-  const [activeWidget, setActiveWidget] = useState<'overview' | 'approval-times'>('overview');
+  const [activeWidget, setActiveWidget] = useState<
+    'overview' | 'approval-times'
+  >('overview');
 
   if (requestsLoading || kpisLoading) {
     return (
@@ -61,8 +65,11 @@ const Dashboard: React.FC = () => {
   }
 
   // Apply filters
-  const filteredRequests = requests.filter(request => {
-    if (businessCaseFilter !== 'All' && !request.business_case_type?.includes(businessCaseFilter)) {
+  const filteredRequests = requests.filter((request) => {
+    if (
+      businessCaseFilter !== 'All' &&
+      !request.business_case_type?.includes(businessCaseFilter)
+    ) {
       return false;
     }
     if (yearFilter !== 'All' && request.start_year.toString() !== yearFilter) {
@@ -75,47 +82,88 @@ const Dashboard: React.FC = () => {
   });
 
   // Calculate metrics using base currency (USD) for consistency
-  const totalInvestment = filteredRequests.reduce((sum, req) => sum + (req.base_currency_capex + req.base_currency_opex), 0);
-  const approvedRequests = filteredRequests.filter(req => req.status === 'Approved');
-  const pendingRequests = filteredRequests.filter(req => ['Under Review', 'Submitted'].includes(req.status));
-  const inBudgetRequests = filteredRequests.filter(req => req.is_in_budget);
-  const approvalRate = filteredRequests.length > 0 ? (approvedRequests.length / filteredRequests.length) * 100 : 0;
-  const avgROI = kpis.length > 0 ? kpis.reduce((sum, kpi) => sum + kpi.irr, 0) / kpis.length : 0;
+  const totalInvestment = filteredRequests.reduce(
+    (sum, req) => sum + (req.base_currency_capex + req.base_currency_opex),
+    0,
+  );
+  const approvedRequests = filteredRequests.filter(
+    (req) => req.status === 'Approved',
+  );
+  const pendingRequests = filteredRequests.filter((req) =>
+    ['Under Review', 'Submitted'].includes(req.status),
+  );
+  const inBudgetRequests = filteredRequests.filter((req) => req.is_in_budget);
+  const approvalRate =
+    filteredRequests.length > 0
+      ? (approvedRequests.length / filteredRequests.length) * 100
+      : 0;
+  const avgROI =
+    kpis.length > 0
+      ? kpis.reduce((sum, kpi) => sum + kpi.irr, 0) / kpis.length
+      : 0;
 
   // ESG specific calculations
-  const esgRequests = filteredRequests.filter(req => req.business_case_type?.includes('ESG'));
+  const esgRequests = filteredRequests.filter((req) =>
+    req.business_case_type?.includes('ESG'),
+  );
   const totalCarbonFootprint = esgRequests.reduce((sum, req) => {
-    if (req.carbon_footprint_data && Object.keys(req.carbon_footprint_data).length > 0) {
-      const impact = ESGCalculator.calculateCarbonFootprint(req.carbon_footprint_data);
+    if (
+      req.carbon_footprint_data &&
+      Object.keys(req.carbon_footprint_data).length > 0
+    ) {
+      const impact = ESGCalculator.calculateCarbonFootprint(
+        req.carbon_footprint_data as CarbonFootprintData,
+      );
       return sum + impact.totalEmissions;
     }
     return sum;
   }, 0);
 
   const totalCarbonReduction = esgRequests.reduce((sum, req) => {
-    if (req.carbon_footprint_data && Object.keys(req.carbon_footprint_data).length > 0) {
-      const impact = ESGCalculator.calculateCarbonFootprint(req.carbon_footprint_data);
+    if (
+      req.carbon_footprint_data &&
+      Object.keys(req.carbon_footprint_data).length > 0
+    ) {
+      const impact = ESGCalculator.calculateCarbonFootprint(
+        req.carbon_footprint_data as CarbonFootprintData,
+      );
       return sum + impact.reductionPotential;
     }
     return sum;
   }, 0);
 
-  const avgESGScore = esgRequests.length > 0 ? esgRequests.reduce((sum, req) => {
-    if (req.carbon_footprint_data && Object.keys(req.carbon_footprint_data).length > 0) {
-      const impact = ESGCalculator.calculateCarbonFootprint(req.carbon_footprint_data);
-      return sum + impact.esgScore;
-    }
-    return sum;
-  }, 0) / esgRequests.length : 0;
+  const avgESGScore =
+    esgRequests.length > 0
+      ? esgRequests.reduce((sum, req) => {
+          if (
+            req.carbon_footprint_data &&
+            Object.keys(req.carbon_footprint_data).length > 0
+          ) {
+            const impact = ESGCalculator.calculateCarbonFootprint(
+              req.carbon_footprint_data as CarbonFootprintData,
+            );
+            return sum + impact.esgScore;
+          }
+          return sum;
+        }, 0) / esgRequests.length
+      : 0;
 
   // Get unique values for filters
-  const uniqueYears = [...new Set(requests.map(req => req.start_year.toString()))].sort();
-  const uniqueDepartments = [...new Set(requests.map(req => req.department))].sort();
-  const uniqueBusinessCaseTypes = [...new Set(requests.flatMap(req => req.business_case_type || []))].sort();
+  const uniqueYears = [
+    ...new Set(requests.map((req) => req.start_year.toString())),
+  ].sort();
+  const uniqueDepartments = [
+    ...new Set(requests.map((req) => req.department)),
+  ].sort();
+  const uniqueBusinessCaseTypes = [
+    ...new Set(requests.flatMap((req) => req.business_case_type || [])),
+  ].sort();
 
   // Chart data by department (using base currency)
   const departmentData = filteredRequests.reduce((acc, req) => {
-    acc[req.department] = (acc[req.department] || 0) + (req.base_currency_capex + req.base_currency_opex);
+    acc[req.department] =
+      (acc[req.department] || 0) +
+      (req.base_currency_capex + req.base_currency_opex);
     return acc;
   }, {} as Record<string, number>);
 
@@ -127,32 +175,43 @@ const Dashboard: React.FC = () => {
   // Business Case Type data
   const businessCaseData = filteredRequests.reduce((acc, req) => {
     if (req.business_case_type && req.business_case_type.length > 0) {
-      req.business_case_type.forEach(caseType => {
-        acc[caseType] = (acc[caseType] || 0) + (req.base_currency_capex + req.base_currency_opex);
+      req.business_case_type.forEach((caseType) => {
+        acc[caseType] =
+          (acc[caseType] || 0) +
+          (req.base_currency_capex + req.base_currency_opex);
       });
     }
     return acc;
   }, {} as Record<string, number>);
 
-  const businessCaseChartData = Object.entries(businessCaseData).map(([caseType, amount]) => ({
-    businessCase: caseType,
-    amount: amount / 1000, // Convert to thousands
-  }));
+  const businessCaseChartData = Object.entries(businessCaseData).map(
+    ([caseType, amount]) => ({
+      businessCase: caseType,
+      amount: amount / 1000, // Convert to thousands
+    }),
+  );
 
   // ESG Impact Chart Data
-  const esgImpactData = esgRequests.map(req => {
-    if (req.carbon_footprint_data && Object.keys(req.carbon_footprint_data).length > 0) {
-      const impact = ESGCalculator.calculateCarbonFootprint(req.carbon_footprint_data);
-      return {
-        name: req.project_title.substring(0, 20) + '...',
-        emissions: impact.totalEmissions,
-        reduction: impact.reductionPotential,
-        esgScore: impact.esgScore,
-        investment: (req.base_currency_capex + req.base_currency_opex) / 1000
-      };
-    }
-    return null;
-  }).filter(Boolean);
+  const esgImpactData = esgRequests
+    .map((req) => {
+      if (
+        req.carbon_footprint_data &&
+        Object.keys(req.carbon_footprint_data).length > 0
+      ) {
+        const impact = ESGCalculator.calculateCarbonFootprint(
+          req.carbon_footprint_data as CarbonFootprintData,
+        );
+        return {
+          name: req.project_title.substring(0, 20) + '...',
+          emissions: impact.totalEmissions,
+          reduction: impact.reductionPotential,
+          esgScore: impact.esgScore,
+          investment: (req.base_currency_capex + req.base_currency_opex) / 1000,
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
 
   // Currency distribution data
   const currencyData = filteredRequests.reduce((acc, req) => {
@@ -170,7 +229,14 @@ const Dashboard: React.FC = () => {
     value: count,
   }));
 
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
+  const COLORS = [
+    '#3B82F6',
+    '#10B981',
+    '#F59E0B',
+    '#EF4444',
+    '#8B5CF6',
+    '#06B6D4',
+  ];
 
   const monthlyData = [
     { month: 'Jan', requests: 12, approved: 8, investment: 2400 },
@@ -218,10 +284,14 @@ const Dashboard: React.FC = () => {
   // Custom label function for pie chart that handles responsive display
   const renderCustomizedLabel = (entry: any, index: number) => {
     const RADIAN = Math.PI / 180;
-    const radius = entry.innerRadius + (entry.outerRadius - entry.innerRadius) * 0.5;
+    const radius =
+      entry.innerRadius + (entry.outerRadius - entry.innerRadius) * 0.5;
     const x = entry.cx + radius * Math.cos(-entry.midAngle * RADIAN);
     const y = entry.cy + radius * Math.sin(-entry.midAngle * RADIAN);
-    const percent = ((entry.value / pieData.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(0);
+    const percent = (
+      (entry.value / pieData.reduce((sum, item) => sum + item.value, 0)) *
+      100
+    ).toFixed(0);
 
     // Only show label if percentage is significant enough (>5%) to avoid clutter
     if (parseFloat(percent) < 5) {
@@ -229,11 +299,11 @@ const Dashboard: React.FC = () => {
     }
 
     return (
-      <text 
-        x={x} 
-        y={y} 
-        fill="white" 
-        textAnchor={x > entry.cx ? 'start' : 'end'} 
+      <text
+        x={x}
+        y={y}
+        fill="white"
+        textAnchor={x > entry.cx ? 'start' : 'end'}
         dominantBaseline="central"
         fontSize="12"
         fontWeight="600"
@@ -248,16 +318,19 @@ const Dashboard: React.FC = () => {
   const CustomLegend = ({ payload }: any) => (
     <div className="flex flex-wrap justify-center gap-2 mt-4">
       {payload.map((entry: any, index: number) => (
-        <div key={index} className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-lg">
-          <div 
-            className="w-3 h-3 rounded-full" 
+        <div
+          key={index}
+          className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-lg"
+        >
+          <div
+            className="w-3 h-3 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
           <span className="text-xs font-medium text-gray-700 truncate max-w-20">
             {entry.value}
           </span>
           <span className="text-xs text-gray-500">
-            ({pieData.find(item => item.name === entry.value)?.value ||  0})
+            ({pieData.find((item) => item.name === entry.value)?.value || 0})
           </span>
         </div>
       ))}
@@ -266,13 +339,20 @@ const Dashboard: React.FC = () => {
 
   const getBusinessCaseIcon = (caseType: string) => {
     switch (caseType) {
-      case 'ESG': return <Leaf className="w-4 h-4" />;
-      case 'IPO Prep': return <TrendingUp className="w-4 h-4" />;
-      case 'Compliance': return <Scale className="w-4 h-4" />;
-      case 'Expansion': return <Globe className="w-4 h-4" />;
-      case 'Asset Creation': return  <Package className="w-4 h-4" />;
-      case 'Cost Control': return <DollarSign className="w-4 h-4" />;
-      default: return <Building2 className="w-4 h-4" />;
+      case 'ESG':
+        return <Leaf className="w-4 h-4" />;
+      case 'IPO Prep':
+        return <TrendingUp className="w-4 h-4" />;
+      case 'Compliance':
+        return <Scale className="w-4 h-4" />;
+      case 'Expansion':
+        return <Globe className="w-4 h-4" />;
+      case 'Asset Creation':
+        return <Package className="w-4 h-4" />;
+      case 'Cost Control':
+        return <DollarSign className="w-4 h-4" />;
+      default:
+        return <Building2 className="w-4 h-4" />;
     }
   };
 
@@ -283,16 +363,24 @@ const Dashboard: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2">Investment Dashboard</h1>
-            <p className="text-blue-100">Monitor and analyze investment requests across your organization</p>
+            <p className="text-blue-100">
+              Monitor and analyze investment requests across your organization
+            </p>
           </div>
           <div className="hidden md:flex items-center space-x-6">
             <div className="text-center">
-              <div className="text-2xl font-bold">{filteredRequests.length}</div>
+              <div className="text-2xl font-bold">
+                {filteredRequests.length}
+              </div>
               <div className="text-sm text-blue-100">Total Requests</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold">${(totalInvestment / 1000000).toFixed(1)}M</div>
-              <div className="text-sm text-blue-100">Total Investment (USD)</div>
+              <div className="text-2xl font-bold">
+                ${(totalInvestment / 1000000).toFixed(1)}M
+              </div>
+              <div className="text-sm text-blue-100">
+                Total Investment (USD)
+              </div>
             </div>
           </div>
         </div>
@@ -301,7 +389,9 @@ const Dashboard: React.FC = () => {
       {/* Widget Selector */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center gap-4 mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Dashboard Views</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            Dashboard Views
+          </h3>
         </div>
         <div className="flex gap-2">
           <button
@@ -342,47 +432,59 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Business Case Type</label>
-                <select
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Business Case Type
+                </label>
+                <StyledDropdown
                   value={businessCaseFilter}
                   onChange={(e) => setBusinessCaseFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="All Business Cases"
                 >
                   <option value="All">All Business Cases</option>
-                  {uniqueBusinessCaseTypes.map(caseType => (
-                    <option key={caseType} value={caseType}>{caseType}</option>
+                  {uniqueBusinessCaseTypes.map((caseType) => (
+                    <option key={caseType} value={caseType}>
+                      {caseType}
+                    </option>
                   ))}
-                </select>
+                </StyledDropdown>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
-                <select
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Year
+                </label>
+                <StyledDropdown
                   value={yearFilter}
                   onChange={(e) => setYearFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="All Years"
                 >
                   <option value="All">All Years</option>
-                  {uniqueYears.map(year => (
-                    <option key={year} value={year}>{year}</option>
+                  {uniqueYears.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
                   ))}
-                </select>
+                </StyledDropdown>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
-                <select
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Department
+                </label>
+                <StyledDropdown
                   value={departmentFilter}
                   onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="All Departments"
                 >
                   <option value="All">All Departments</option>
-                  {uniqueDepartments.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
+                  {uniqueDepartments.map((dept) => (
+                    <option key={dept} value={dept}>
+                      {dept}
+                    </option>
                   ))}
-                </select>
+                </StyledDropdown>
               </div>
-              
+
               <div className="flex items-end">
                 <button
                   onClick={() => {
@@ -403,7 +505,9 @@ const Dashboard: React.FC = () => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Investment</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Total Investment
+                  </p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">
                     ${(totalInvestment / 1000000).toFixed(1)}M
                   </p>
@@ -415,16 +519,24 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="mt-4 flex items-center">
                 <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600 font-medium">+12.5%</span>
-                <span className="text-sm text-gray-500 ml-1">vs last quarter</span>
+                <span className="text-sm text-green-600 font-medium">
+                  +12.5%
+                </span>
+                <span className="text-sm text-gray-500 ml-1">
+                  vs last quarter
+                </span>
               </div>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Approval Rate</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{approvalRate.toFixed(1)}%</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Approval Rate
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {approvalRate.toFixed(1)}%
+                  </p>
                   <p className="text-xs text-gray-500 mt-1">YTD 2024</p>
                 </div>
                 <div className="flex items-center justify-center w-12 h-12 bg-green-50 rounded-xl">
@@ -433,17 +545,27 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="mt-4 flex items-center">
                 <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600 font-medium">+5.2%</span>
-                <span className="text-sm text-gray-500 ml-1">vs last quarter</span>
+                <span className="text-sm text-green-600 font-medium">
+                  +5.2%
+                </span>
+                <span className="text-sm text-gray-500 ml-1">
+                  vs last quarter
+                </span>
               </div>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Average IRR</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{avgROI.toFixed(1)}%</p>
-                  <p className="text-xs text-gray-500 mt-1">Portfolio Average</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Average IRR
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {avgROI.toFixed(1)}%
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Portfolio Average
+                  </p>
                 </div>
                 <div className="flex items-center justify-center w-12 h-12 bg-purple-50 rounded-xl">
                   <TrendingUp className="w-6 h-6 text-purple-600" />
@@ -451,7 +573,9 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="mt-4 flex items-center">
                 <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600 font-medium">+2.1%</span>
+                <span className="text-sm text-green-600 font-medium">
+                  +2.1%
+                </span>
                 <span className="text-sm text-gray-500 ml-1">vs target</span>
               </div>
             </div>
@@ -459,8 +583,12 @@ const Dashboard: React.FC = () => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Pending Reviews</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{pendingRequests.length}</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Pending Reviews
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    {pendingRequests.length}
+                  </p>
                   <p className="text-xs text-gray-500 mt-1">Awaiting Action</p>
                 </div>
                 <div className="flex items-center justify-center w-12 h-12 bg-yellow-50 rounded-xl">
@@ -469,8 +597,12 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="mt-4 flex items-center">
                 <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
-                <span className="text-sm text-red-600 font-medium">-3 days</span>
-                <span className="text-sm text-gray-500 ml-1">avg processing</span>
+                <span className="text-sm text-red-600 font-medium">
+                  -3 days
+                </span>
+                <span className="text-sm text-gray-500 ml-1">
+                  avg processing
+                </span>
               </div>
             </div>
           </div>
@@ -499,7 +631,9 @@ const Dashboard: React.FC = () => {
                   <div className="text-2xl font-bold text-green-600">
                     {formatEmissions(totalCarbonReduction)}
                   </div>
-                  <div className="text-sm text-green-700">Reduction Potential</div>
+                  <div className="text-sm text-green-700">
+                    Reduction Potential
+                  </div>
                 </div>
                 <div className="bg-white rounded-lg p-4">
                   <div className="text-2xl font-bold text-green-600">
@@ -516,26 +650,35 @@ const Dashboard: React.FC = () => {
             {/* Investment by Department */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Investment by Department</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Investment by Department
+                </h3>
                 <BarChart3 className="w-5 h-5 text-gray-400" />
               </div>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="department" 
+                    <XAxis
+                      dataKey="department"
                       tick={{ fontSize: 12 }}
                       angle={-45}
                       textAnchor="end"
                       height={80}
                     />
                     <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip 
-                      formatter={(value: number) => [`$${value}K USD`, 'Investment']}
+                    <Tooltip
+                      formatter={(value: number) => [
+                        `$${value}K USD`,
+                        'Investment',
+                      ]}
                       labelStyle={{ color: '#374151' }}
                     />
-                    <Bar dataKey="amount" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                    <Bar
+                      dataKey="amount"
+                      fill="#3B82F6"
+                      radius={[4, 4, 0, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -544,7 +687,9 @@ const Dashboard: React.FC = () => {
             {/* Request Status Distribution */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Request Status Distribution</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Request Status Distribution
+                </h3>
                 <PieChart className="w-5 h-5 text-gray-400" />
               </div>
               <div className="h-80">
@@ -561,10 +706,13 @@ const Dashboard: React.FC = () => {
                       dataKey="value"
                     >
                       {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
                       ))}
                     </Pie>
-                    <Tooltip 
+                    <Tooltip
                       formatter={(value: number, name: string) => [value, name]}
                       labelStyle={{ color: '#374151' }}
                     />
@@ -572,10 +720,12 @@ const Dashboard: React.FC = () => {
                 </ResponsiveContainer>
               </div>
               {/* Custom Legend below the chart */}
-              <CustomLegend payload={pieData.map((item, index) => ({
-                value: item.name,
-                color: COLORS[index % COLORS.length]
-              }))} />
+              <CustomLegend
+                payload={pieData.map((item, index) => ({
+                  value: item.name,
+                  color: COLORS[index % COLORS.length],
+                }))}
+              />
             </div>
           </div>
 
@@ -583,7 +733,9 @@ const Dashboard: React.FC = () => {
           {businessCaseChartData.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Investment by Business Case Type</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Investment by Business Case Type
+                </h3>
                 <Building2 className="w-5 h-5 text-gray-400" />
               </div>
               <div className="h-80">
@@ -591,17 +743,24 @@ const Dashboard: React.FC = () => {
                   <BarChart data={businessCaseChartData} layout="horizontal">
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis type="number" tick={{ fontSize: 12 }} />
-                    <YAxis 
-                      dataKey="businessCase" 
+                    <YAxis
+                      dataKey="businessCase"
                       type="category"
                       tick={{ fontSize: 12 }}
                       width={100}
                     />
-                    <Tooltip 
-                      formatter={(value: number) => [`$${value}K USD`, 'Investment']}
+                    <Tooltip
+                      formatter={(value: number) => [
+                        `$${value}K USD`,
+                        'Investment',
+                      ]}
                       labelStyle={{ color: '#374151' }}
                     />
-                    <Bar dataKey="amount" fill="#8B5CF6" radius={[0, 4, 4, 0]} />
+                    <Bar
+                      dataKey="amount"
+                      fill="#8B5CF6"
+                      radius={[0, 4, 4, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -612,22 +771,24 @@ const Dashboard: React.FC = () => {
           {esgImpactData.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">ESG Impact vs Investment</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  ESG Impact vs Investment
+                </h3>
                 <Leaf className="w-5 h-5 text-green-600" />
               </div>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={esgImpactData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="name" 
+                    <XAxis
+                      dataKey="name"
                       tick={{ fontSize: 10 }}
                       angle={-45}
                       textAnchor="end"
                       height={80}
                     />
                     <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip 
+                    <Tooltip
                       formatter={(value: number, name: string) => {
                         if (name === 'emissions' || name === 'reduction') {
                           return [`${value.toFixed(1)} tons CO₂e`, name];
@@ -639,28 +800,28 @@ const Dashboard: React.FC = () => {
                       }}
                       labelStyle={{ color: '#374151' }}
                     />
-                    <Area 
-                      type="monotone" 
-                      dataKey="emissions" 
-                      stackId="1" 
-                      stroke="#EF4444" 
-                      fill="#EF4444" 
+                    <Area
+                      type="monotone"
+                      dataKey="emissions"
+                      stackId="1"
+                      stroke="#EF4444"
+                      fill="#EF4444"
                       fillOpacity={0.3}
                       name="emissions"
                     />
-                    <Area 
-                      type="monotone" 
-                      dataKey="reduction" 
-                      stackId="2" 
-                      stroke="#10B981" 
-                      fill="#10B981" 
+                    <Area
+                      type="monotone"
+                      dataKey="reduction"
+                      stackId="2"
+                      stroke="#10B981"
+                      fill="#10B981"
                       fillOpacity={0.3}
                       name="reduction"
                     />
-                    <Line 
-                      type="monotone" 
-                      dataKey="investment" 
-                      stroke="#3B82F6" 
+                    <Line
+                      type="monotone"
+                      dataKey="investment"
+                      stroke="#3B82F6"
                       strokeWidth={2}
                       name="investment"
                     />
@@ -674,15 +835,24 @@ const Dashboard: React.FC = () => {
           {Object.keys(currencyData).length > 1 && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Currency Distribution</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Currency Distribution
+                </h3>
                 <DollarSign className="w-5 h-5 text-gray-400" />
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {Object.entries(currencyData).map(([currency, count]) => (
-                  <div key={currency} className="text-center p-4 bg-gray-50 rounded-xl">
-                    <div className="text-2xl font-bold text-gray-900">{count}</div>
+                  <div
+                    key={currency}
+                    className="text-center p-4 bg-gray-50 rounded-xl"
+                  >
+                    <div className="text-2xl font-bold text-gray-900">
+                      {count}
+                    </div>
                     <div className="text-sm text-gray-600">{currency}</div>
-                    <div className="text-xs text-gray-500">{getCurrencySymbol(currency)}</div>
+                    <div className="text-xs text-gray-500">
+                      {getCurrencySymbol(currency)}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -692,7 +862,9 @@ const Dashboard: React.FC = () => {
           {/* Monthly Trends */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Monthly Investment Trends</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Monthly Investment Trends
+              </h3>
               <Activity className="w-5 h-5 text-gray-400" />
             </div>
             <div className="h-80">
@@ -702,19 +874,19 @@ const Dashboard: React.FC = () => {
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip />
-                  <Area 
-                    type="monotone" 
-                    dataKey="investment" 
-                    stackId="1" 
-                    stroke="#3B82F6" 
-                    fill="#3B82F6" 
+                  <Area
+                    type="monotone"
+                    dataKey="investment"
+                    stackId="1"
+                    stroke="#3B82F6"
+                    fill="#3B82F6"
                     fillOpacity={0.1}
                     name="Investment ($K USD)"
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="approved" 
-                    stroke="#10B981" 
+                  <Line
+                    type="monotone"
+                    dataKey="approved"
+                    stroke="#10B981"
                     strokeWidth={3}
                     name="Approved Requests"
                   />
@@ -726,7 +898,9 @@ const Dashboard: React.FC = () => {
           {/* Recent Requests Table */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100">
             <div className="px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">Recent Investment Requests</h2>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Recent Investment Requests
+              </h2>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -763,47 +937,72 @@ const Dashboard: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredRequests.slice(0, 10).map((request) => (
-                    <tr key={request.id} className="hover:bg-gray-50 transition-colors">
+                    <tr
+                      key={request.id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{request.project_title}</div>
-                          <div className="text-sm text-gray-500">{request.department}</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {request.project_title}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {request.department}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-wrap gap-1">
-                          {request.business_case_type?.slice(0, 2).map((caseType) => (
-                            <span key={caseType} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                              {getBusinessCaseIcon(caseType)}
-                              <span className="ml-1">{caseType}</span>
-                            </span>
-                          ))}
-                          {request.business_case_type && request.business_case_type.length > 2 && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                              +{request.business_case_type.length - 2}
-                            </span>
-                          )}
+                          {request.business_case_type
+                            ?.slice(0, 2)
+                            .map((caseType) => (
+                              <span
+                                key={caseType}
+                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
+                              >
+                                {getBusinessCaseIcon(caseType)}
+                                <span className="ml-1">{caseType}</span>
+                              </span>
+                            ))}
+                          {request.business_case_type &&
+                            request.business_case_type.length > 2 && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                +{request.business_case_type.length - 2}
+                              </span>
+                            )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <Building className="w-4 h-4 text-gray-400 mr-2" />
-                          <span className="text-sm text-gray-900">{request.legal_entity}</span>
+                          <span className="text-sm text-gray-900">
+                            {request.legal_entity}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <MapPin className="w-4 h-4 text-gray-400 mr-2" />
-                          <span className="text-sm text-gray-900">{request.location}</span>
+                          <span className="text-sm text-gray-900">
+                            {request.location}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {formatCurrency(request.capex + request.opex, request.currency)}
+                          {formatCurrency(
+                            request.capex + request.opex,
+                            request.currency,
+                          )}
                         </div>
                         {request.currency !== 'USD' && (
                           <div className="text-xs text-gray-500">
-                            ≈ ${(request.base_currency_capex + request.base_currency_opex).toLocaleString()} USD
+                            ≈ $
+                            {(
+                              request.base_currency_capex +
+                              request.base_currency_opex
+                            ).toLocaleString()}{' '}
+                            USD
                           </div>
                         )}
                       </td>
@@ -813,19 +1012,31 @@ const Dashboard: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(request.priority)}`}>
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(
+                            request.priority,
+                          )}`}
+                        >
                           {request.priority}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full border ${getStatusColor(request.status)}`}>
+                        <span
+                          className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full border ${getStatusColor(
+                            request.status,
+                          )}`}
+                        >
                           {request.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          request.is_in_budget ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            request.is_in_budget
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
+                        >
                           {request.is_in_budget ? 'In Budget' : 'Out of Budget'}
                         </span>
                       </td>
@@ -834,7 +1045,7 @@ const Dashboard: React.FC = () => {
                 </tbody>
               </table>
             </div>
-            
+
             {filteredRequests.length === 0 && (
               <div className="text-center py-12 text-gray-500">
                 <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
