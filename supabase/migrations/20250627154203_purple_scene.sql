@@ -301,9 +301,10 @@ DECLARE
   v_requester RECORD;
   v_total_amount numeric;
 BEGIN
-  -- Only process if status is changing to 'Submitted' or a pending status
+  -- Process if status is 'Submitted' or a pending status
+  -- Handle both INSERT (new requests) and UPDATE (status changes)
   IF (NEW.status = 'Submitted' OR NEW.status LIKE 'Pending - Level %') AND 
-     (OLD.status IS NULL OR OLD.status = 'Draft') THEN
+     (TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND (OLD.status IS NULL OR OLD.status = 'Draft'))) THEN
     
     -- Get requester info
     SELECT name, email INTO v_requester
@@ -326,7 +327,8 @@ BEGIN
         type,
         action_url,
         priority,
-        metadata
+        metadata,
+        created_at
       ) VALUES (
         v_approver.user_id,
         NEW.id,
@@ -344,7 +346,8 @@ BEGIN
           'currency', NEW.currency,
           'requesterName', v_requester.name,
           'businessCaseTypes', NEW.business_case_type
-        )
+        ),
+        now()
       );
     END LOOP;
   END IF;
@@ -353,9 +356,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger for notification on request submission
+-- Drop existing trigger if it exists
+DROP TRIGGER IF EXISTS trigger_notify_on_request_submission ON investment_requests;
+
+-- Create trigger for notification on request submission (both INSERT and UPDATE)
 CREATE TRIGGER trigger_notify_on_request_submission
-  AFTER UPDATE OF status ON investment_requests
+  AFTER INSERT OR UPDATE OF status ON investment_requests
   FOR EACH ROW
   EXECUTE FUNCTION notify_on_request_submission();
 

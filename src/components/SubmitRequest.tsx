@@ -26,6 +26,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useInvestmentRequests, useKPIs } from '../hooks/useSupabase';
 import { CarbonFootprintData, CarbonImpactResult } from '../lib/esgCalculator';
+import { NotificationManager } from '../lib/notificationManager';
 import {
   BUSINESS_CASE_TYPES,
   InvestmentRequest,
@@ -562,6 +563,31 @@ const SubmitRequest: React.FC = () => {
       const newRequest = await addRequest(requestData);
 
       console.log('Request submitted successfully:', newRequest);
+
+      // Send notifications to approvers
+      try {
+        console.log('Sending notifications for request:', {
+          id: newRequest.id,
+          title: newRequest.project_title,
+          amount: capex + opex,
+          currency: formData.currency,
+          requester: profile?.name,
+          businessCaseTypes: formData.business_case_type,
+        });
+
+        await NotificationManager.notifyApprovers(
+          newRequest.id,
+          newRequest.project_title,
+          capex + opex,
+          formData.currency,
+          profile?.name || 'Unknown User',
+          formData.business_case_type,
+        );
+        console.log('Notifications sent to approvers successfully');
+      } catch (notificationError) {
+        console.error('Error sending notifications:', notificationError);
+        // Don't fail the submission for notification errors
+      }
 
       // Add KPI data if provided
       if (formData.irr || formData.npv || formData.payback_period) {

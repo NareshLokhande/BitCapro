@@ -58,6 +58,19 @@ const ApprovalTracker: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Prevent body scroll when modals are open
+  React.useEffect(() => {
+    if (showApprovalModal || showAIInsights) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showApprovalModal, showAIInsights]);
+
   if (requestsLoading || logsLoading || kpisLoading || matrixLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -521,15 +534,18 @@ const ApprovalTracker: React.FC = () => {
 
       {/* AI Insights Modal */}
       {showAIInsights && selectedRequestData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+        <div
+          className="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-90 flex items-center justify-center z-[9999] p-4 overflow-hidden"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h3 className="text-xl font-semibold text-gray-900">
                 AI Insights for {selectedRequestData.project_title}
               </h3>
               <button
                 onClick={() => setShowAIInsights(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <XCircle className="w-6 h-6" />
               </button>
@@ -1177,8 +1193,11 @@ const ApprovalTracker: React.FC = () => {
 
       {/* Approval Modal */}
       {showApprovalModal && selectedRequestData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+        <div
+          className="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-90 flex items-center justify-center z-[9999] p-4 overflow-hidden"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               {hasUserActedOnRequest(selectedRequestData.id)
                 ? 'Update Decision'

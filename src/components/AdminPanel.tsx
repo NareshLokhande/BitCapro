@@ -4,6 +4,7 @@ import {
   Database,
   DollarSign,
   Edit,
+  MessageSquare,
   Plus,
   Save,
   Search,
@@ -25,6 +26,7 @@ import {
   useKPIs,
   useUserManagement,
 } from '../hooks/useSupabase';
+import { NotificationManager } from '../lib/notificationManager';
 import { NotificationService } from '../lib/notifications';
 import { ApprovalMatrix } from '../lib/supabase';
 import StyledDropdown from './StyledDropdown';
@@ -318,6 +320,34 @@ const AdminPanel: React.FC = () => {
       console.error('Test notification error:', error);
       alert(
         `❌ Test notification failed: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }\n\nCheck the browser console for detailed error information.`,
+      );
+    }
+  };
+
+  // Test approver notification function
+  const testApproverNotification = async () => {
+    try {
+      console.log('Testing approver notification system...');
+
+      // Test the NotificationManager.notifyApprovers function
+      await NotificationManager.notifyApprovers(
+        'test-request-002',
+        'Test Project - Notification System',
+        250000, // Medium priority amount
+        'USD',
+        'Test User',
+        ['ESG', 'Cost Control'],
+      );
+
+      alert(
+        '✅ Test approver notification sent successfully!\n\nCheck the notifications panel to see if approvers received the notification.',
+      );
+    } catch (error) {
+      console.error('Test approver notification error:', error);
+      alert(
+        `❌ Test approver notification failed: ${
           error instanceof Error ? error.message : 'Unknown error'
         }\n\nCheck the browser console for detailed error information.`,
       );
@@ -1329,10 +1359,18 @@ const AdminPanel: React.FC = () => {
                 </p>
                 <button
                   onClick={testRejectionNotification}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+                  className="flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                >
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Test Rejection Notification
+                </button>
+
+                <button
+                  onClick={testApproverNotification}
+                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   <Bell className="w-4 h-4 mr-2" />
-                  Test Rejection Notification
+                  Test Approver Notification
                 </button>
               </div>
             </div>

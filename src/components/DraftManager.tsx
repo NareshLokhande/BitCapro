@@ -1,5 +1,6 @@
 import {
   AlertCircle,
+  Bell,
   Building,
   Calendar,
   Clock,
@@ -15,6 +16,7 @@ import {
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../hooks/useNotifications';
 import { useInvestmentRequests } from '../hooks/useSupabase';
 import { formatCurrency, InvestmentRequest } from '../lib/supabase';
 import StyledDropdown from './StyledDropdown';
@@ -22,6 +24,7 @@ import StyledDropdown from './StyledDropdown';
 const DraftManager: React.FC = () => {
   const navigate = useNavigate();
   const { fetchDrafts, deleteDraft, completeDraft } = useInvestmentRequests();
+  const { notifications } = useNotifications();
   const { profile } = useAuth();
   const [drafts, setDrafts] = useState<InvestmentRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,6 +126,14 @@ const DraftManager: React.FC = () => {
         {type}
       </span>
     ));
+  };
+
+  // Helper function to check if a draft has unread notifications
+  const hasUnreadNotifications = (draftId: string) => {
+    return notifications.some(
+      (notification: any) =>
+        notification.request_id === draftId && !notification.read,
+    );
   };
 
   if (loading) {
@@ -266,6 +277,12 @@ const DraftManager: React.FC = () => {
                         <Clock className="w-3 h-3 mr-1" />
                         Draft
                       </span>
+                      {hasUnreadNotifications(draft.id) && (
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                          <Bell className="w-3 h-3 mr-1" />
+                          Updates
+                        </span>
+                      )}
                     </div>
 
                     <p className="text-gray-600 mb-4 line-clamp-2">

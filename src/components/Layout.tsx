@@ -1,10 +1,8 @@
 import {
-  Bell,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
-  Clock,
   FileText,
   Home,
   LayoutDashboard,
@@ -341,7 +339,7 @@ const Layout: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
+      <div className="lg:hidden fixed top-4 left-4 z-30">
         <button
           onClick={handleMobileMenuToggle}
           className="p-2 rounded-xl bg-white shadow-lg border border-gray-200 hover:bg-gray-50 transition-all duration-200"
@@ -351,7 +349,7 @@ const Layout: React.FC = () => {
       </div>
 
       {/* Desktop collapse button */}
-      <div className="hidden lg:block fixed top-4 left-4 z-50">
+      <div className="hidden lg:block fixed top-4 left-4 z-30">
         <button
           onClick={handleSidebarToggle}
           className={`p-2 rounded-xl bg-white shadow-lg border border-gray-200 hover:bg-gray-50 transition-all duration-300 ${collapseButtonTransform}`}
@@ -365,20 +363,20 @@ const Layout: React.FC = () => {
       </div>
 
       {/* Header controls */}
-      <div className="fixed top-4 right-4 z-40 flex items-center gap-3">
+      <div className="fixed top-4 right-4 z-20 flex items-center gap-3">
         {/* Notification System */}
         <NotificationSystem />
-        
+
         {/* Session timeout indicator */}
-        <div className="flex items-center px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200 text-xs text-gray-600">
+        {/* <div className="flex items-center px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200 text-xs text-gray-600">
           <Clock className="w-3 h-3 mr-1" />
           Auto-logout: 30min
-        </div>
+        </div> */}
       </div>
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-40 ${sidebarWidth} bg-white shadow-2xl border-r border-gray-100 transform transition-all duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 z-10 ${sidebarWidth} bg-white shadow-2xl border-r border-gray-100 transform transition-all duration-300 ease-in-out ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}
       >
@@ -393,7 +391,7 @@ const Layout: React.FC = () => {
       {/* Mobile overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black bg-opacity-50 lg:hidden backdrop-blur-sm"
+          className="fixed inset-0 z-5 bg-black bg-opacity-50 lg:hidden backdrop-blur-sm"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
