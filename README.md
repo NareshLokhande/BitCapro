@@ -4,6 +4,14 @@ BitCapro is a comprehensive, AI-enhanced investment request and approval platfor
 
 🚀 **Production-ready, mobile-first, and enterprise-grade solution for CapEx + OpEx lifecycle management.**
 
+## 📺 Demo Video
+
+Watch BitCapro in action:
+
+[![BitCapro Demo Video](https://img.youtube.com/vi/s2XkxmNbTJ0/maxresdefault.jpg)](https://youtu.be/s2XkxmNbTJ0?si=GJVk9gSdstj6th0r)
+
+**[Click to watch the full demo](https://youtu.be/s2XkxmNbTJ0?si=GJVk9gSdstj6th0r)**
+
 ---
 
 ## ✨ Key Features
