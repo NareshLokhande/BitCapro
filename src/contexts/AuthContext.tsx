@@ -411,12 +411,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     clearTimeouts(); // Clear all timeouts when signing out
     profileFetchedRef.current = false; // Reset profile fetch flag
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setSession(null);
-    setAuthInitialized(false);
-    setLoading(false);
+    
+    try {
+      // Attempt to sign out from Supabase
+      await supabase.auth.signOut();
+      console.log('Successfully signed out from Supabase');
+    } catch (error) {
+      // Log the error but don't throw it - we still want to clear client state
+      console.warn('Error during Supabase signOut (session may already be invalid):', error);
+    } finally {
+      // Always clear client-side state regardless of server response
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      setAuthInitialized(false);
+      setLoading(false);
+    }
   };
 
   // Helper functions for role checking
