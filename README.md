@@ -1,6 +1,6 @@
-# Approvia — Intelligent Investment Request Management Platform
+# BitCapro — Intelligent Investment Request Management Platform
 
-Approvia is a comprehensive, AI-enhanced investment request and approval platform designed for modern finance, ESG, and operations teams. It transforms traditional spreadsheet-based workflows into intelligent, data-driven decision-making systems with real-time analytics, automated approvals, and comprehensive compliance tracking.
+BitCapro is a comprehensive, AI-enhanced investment request and approval platform designed for modern finance, ESG, and operations teams. It transforms traditional spreadsheet-based workflows into intelligent, data-driven decision-making systems with real-time analytics, automated approvals, and comprehensive compliance tracking.
 
 🚀 **Production-ready, mobile-first, and enterprise-grade solution for CapEx + OpEx lifecycle management.**
 
@@ -164,7 +164,7 @@ Approvia is a comprehensive, AI-enhanced investment request and approval platfor
 
 ```bash
 git clone <your-repo-url>
-cd Approvia
+cd BitCapro
 npm install
 ```
 
@@ -354,4 +354,4 @@ For support and questions:
 
 ---
 
-**Approvia** — Transforming investment management with intelligence and automation. 🚀
+**BitCapro** — Transforming investment management with intelligence and automation. 🚀

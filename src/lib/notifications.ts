@@ -1,4 +1,4 @@
-// Notification System for Approvia
+// Notification System for BitCapro
 // Handles Slack and Email notifications for approval workflows
 
 export interface NotificationConfig {
@@ -63,7 +63,7 @@ export class NotificationService {
       slackWebhookUrl: import.meta.env.VITE_SLACK_WEBHOOK_URL,
       emailService: 'sendgrid',
       emailApiKey: import.meta.env.VITE_SENDGRID_API_KEY,
-      emailFrom: import.meta.env.VITE_EMAIL_FROM || 'noreply@Approvia.com',
+      emailFrom: import.meta.env.VITE_EMAIL_FROM || 'noreply@BitCapro.com',
       emailDomain: import.meta.env.VITE_EMAIL_DOMAIN,
     };
   }
@@ -375,7 +375,7 @@ export class NotificationService {
           attachments: [
             {
               color,
-              footer: 'Approvia Investment Management',
+              footer: 'BitCapro Investment Management',
               ts: Math.floor(Date.now() / 1000),
             },
           ],
@@ -449,7 +449,7 @@ export class NotificationService {
                   : data.action === 'rejected'
                   ? '#ff6b6b'
                   : '#ffa500',
-              footer: 'Approvia Investment Management',
+              footer: 'BitCapro Investment Management',
               ts: Math.floor(Date.now() / 1000),
             },
           ],
@@ -510,7 +510,7 @@ export class NotificationService {
           attachments: [
             {
               color: '#ff6b6b',
-              footer: 'Approvia Investment Management',
+              footer: 'BitCapro Investment Management',
               ts: Math.floor(Date.now() / 1000),
             },
           ],
@@ -588,7 +588,7 @@ export class NotificationService {
           attachments: [
             {
               color: '#ff6b6b',
-              footer: 'Approvia Investment Management',
+              footer: 'BitCapro Investment Management',
               ts: Math.floor(Date.now() / 1000),
             },
           ],
@@ -653,7 +653,7 @@ export class NotificationService {
                   </a>
                 </div>
                 <p style="color: #666; font-size: 12px;">
-                  This is an automated notification from Approvia Investment Management System.
+                  This is an automated notification from BitCapro Investment Management System.
                 </p>
               </div>
             </div>
@@ -777,7 +777,7 @@ export class NotificationService {
                   </a>
                 </div>
                 <p style="color: #666; font-size: 12px;">
-                  This is an automated notification from Approvia Investment Management System.
+                  This is an automated notification from BitCapro Investment Management System.
                 </p>
               </div>
             </div>
@@ -805,7 +805,7 @@ export class NotificationService {
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email: message.to }] }],
-        from: { email: this.config.emailFrom || 'noreply@Approvia.com' },
+        from: { email: this.config.emailFrom || 'noreply@BitCapro.com' },
         subject: message.subject,
         content: [
           { type: 'text/html', value: message.html },
@@ -823,7 +823,7 @@ export class NotificationService {
   // Send via Mailgun
   private static async sendViaMailgun(message: EmailMessage): Promise<boolean> {
     const formData = new FormData();
-    formData.append('from', this.config.emailFrom || 'noreply@Approvia.com');
+    formData.append('from', this.config.emailFrom || 'noreply@BitCapro.com');
     formData.append('to', message.to);
     formData.append('subject', message.subject);
     formData.append('html', message.html);

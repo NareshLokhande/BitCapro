@@ -27,12 +27,12 @@
 -- Note: These profiles will be linked to Auth users when they sign up or are created
 INSERT INTO user_profiles (user_id, email, name, role, department, active) VALUES
   -- Generate placeholder UUIDs for now - these will be updated when real auth users are created
-  (gen_random_uuid(), 'admin@Approvia.com', 'System Administrator', 'Admin', 'IT', true),
-  (gen_random_uuid(), 'ceo@Approvia.com', 'Emily Davis', 'Approver_L4', 'Executive', true),
-  (gen_random_uuid(), 'cfo@Approvia.com', 'Robert Chen', 'Approver_L3', 'Finance', true),
-  (gen_random_uuid(), 'director1@Approvia.com', 'Sarah Wilson', 'Approver_L2', 'Operations', true),
-  (gen_random_uuid(), 'manager1@Approvia.com', 'Mike Johnson', 'Approver_L1', 'Engineering', true),
-  (gen_random_uuid(), 'john.doe@Approvia.com', 'John Doe', 'Submitter', 'Engineering', true)
+  (gen_random_uuid(), 'admin@BitCapro.com', 'System Administrator', 'Admin', 'IT', true),
+  (gen_random_uuid(), 'ceo@BitCapro.com', 'Emily Davis', 'Approver_L4', 'Executive', true),
+  (gen_random_uuid(), 'cfo@BitCapro.com', 'Robert Chen', 'Approver_L3', 'Finance', true),
+  (gen_random_uuid(), 'director1@BitCapro.com', 'Sarah Wilson', 'Approver_L2', 'Operations', true),
+  (gen_random_uuid(), 'manager1@BitCapro.com', 'Mike Johnson', 'Approver_L1', 'Engineering', true),
+  (gen_random_uuid(), 'john.doe@BitCapro.com', 'John Doe', 'Submitter', 'Engineering', true)
 ON CONFLICT (email) DO NOTHING;
 
 -- Insert approval matrix rules to support the approval workflow

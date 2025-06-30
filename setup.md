@@ -1,4 +1,4 @@
-# Approvia Setup Guide
+# BitCapro Setup Guide
 
 ## 🚀 Quick Start Checklist
 
@@ -102,10 +102,10 @@ USING (bucket_id = 'investment-documents');
 
 The migrations create these test users:
 
-- `admin@Approvia.com` / `password123` (Admin)
-- `ceo@Approvia.com` / `password123` (CEO)
-- `cfo@Approvia.com` / `password123` (CFO)
-- `john.doe@Approvia.com` / `password123` (Submitter)
+- `admin@BitCapro.com` / `password123` (Admin)
+- `ceo@BitCapro.com` / `password123` (CEO)
+- `cfo@BitCapro.com` / `password123` (CFO)
+- `john.doe@BitCapro.com` / `password123` (Submitter)
 
 ## 🚨 Common Issues & Solutions
 

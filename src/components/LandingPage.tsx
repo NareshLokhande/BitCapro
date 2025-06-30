@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import BoltBadge from './BoltBadge';
 
 const LandingPage: React.FC = () => {
   const [activeTestimonial, setActiveTestimonial] = useState(0);
@@ -203,7 +204,7 @@ const LandingPage: React.FC = () => {
       role: 'CFO',
       company: 'TechCorp Inc.',
       content:
-        'Approvia transformed our investment approval process. What used to take weeks now happens in days, and we have complete visibility into every decision.',
+        'BitCapro transformed our investment approval process. What used to take weeks now happens in days, and we have complete visibility into every decision.',
       avatar: 'SJ',
       rating: 5,
     },
@@ -230,7 +231,7 @@ const LandingPage: React.FC = () => {
   const quickActions = [
     {
       title: 'View Demo',
-      description: 'See Approvia in action',
+      description: 'See BitCapro in action',
       icon: Play,
       action: () => setIsVideoModalOpen(true),
       color: 'from-blue-500 to-indigo-600',
@@ -246,32 +247,27 @@ const LandingPage: React.FC = () => {
       title: 'Schedule Demo',
       description: 'Book a personalized tour',
       icon: Calendar,
-      action: () => window.open('mailto:demo@Approvia.com'),
+      action: () => window.open('mailto:demo@BitCapro.com'),
       color: 'from-purple-500 to-pink-600',
     },
     {
       title: 'Contact Sales',
       description: 'Talk to our experts',
       icon: MessageCircle,
-      action: () => window.open('mailto:sales@Approvia.com'),
+      action: () => window.open('mailto:sales@BitCapro.com'),
       color: 'from-orange-500 to-red-600',
     },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Bolt Badge */}
-      {/* <div className="fixed top-16 right-4 z-50">
-        <a
-          href="https://bolt.new"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
-        >
-          <Zap className="w-4 h-4 mr-2" />
-          Built on Bolt
-        </a>
-      </div> */}
+      {/* Large Bolt Badge - Top Right Corner */}
+      <BoltBadge
+        position="top-right"
+        variant="auto"
+        size="xxl"
+        backgroundContext="dark"
+      />
 
       {/* Video Modal */}
       {isVideoModalOpen && (
@@ -339,8 +335,8 @@ const LandingPage: React.FC = () => {
         }`}
         id="navbar"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pr-48">
+          <div className="flex items-center justify-center h-16">
             <div className="flex items-center">
               <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl shadow-lg">
                 <CheckCircle2 className="w-6 h-6 text-white" />
@@ -353,13 +349,13 @@ const LandingPage: React.FC = () => {
                       : 'text-white'
                   }`}
                 >
-                  Approvia
+                  BitCapro
                 </h1>
               </div>
             </div>
 
             {/* Desktop Navigation */}
-            <div className="hidden lg:flex items-center space-x-8">
+            <div className="hidden lg:flex items-center space-x-8 ml-12">
               <a
                 href="#features"
                 className={`transition-colors font-medium ${
@@ -414,15 +410,6 @@ const LandingPage: React.FC = () => {
                   <span style={{ color: '#009846' }}>COLLAGE</span>
                 </span>
               </Link>
-              <a
-                href="https://bolt.new"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
-              >
-                <Zap className="w-4 h-4 mr-2" />
-                Built on Bolt
-              </a>
             </div>
 
             {/* Mobile Menu Button */}
@@ -464,7 +451,7 @@ const LandingPage: React.FC = () => {
                 <CheckCircle2 className="w-10 h-10 text-blue-600" />
               </div>
               <div className="ml-4">
-                <h1 className="text-4xl font-bold text-white">Approvia</h1>
+                <h1 className="text-4xl font-bold text-white">BitCapro</h1>
                 <p className="text-blue-100">Investment Management Platform</p>
               </div>
             </div>
@@ -679,7 +666,7 @@ const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h3 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Why Choose Approvia?
+              Why Choose BitCapro?
             </h3>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Transform your investment process with measurable improvements
@@ -794,7 +781,7 @@ const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h3 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              How Approvia Works
+              How BitCapro Works
             </h3>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Simple, efficient workflow from request to approval
@@ -899,7 +886,7 @@ const LandingPage: React.FC = () => {
             Ready to Transform Your Investment Process?
           </h3>
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-            Join forward-thinking organizations using Approvia to streamline
+            Join forward-thinking organizations using BitCapro to streamline
             their investment workflows
           </p>
 
@@ -1161,7 +1148,7 @@ const LandingPage: React.FC = () => {
                 </div>
                 <div className="ml-4">
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                    Approvia
+                    BitCapro
                   </h1>
                   <p className="text-sm text-gray-400">
                     Investment Management Platform
@@ -1175,7 +1162,7 @@ const LandingPage: React.FC = () => {
               </p>
               <div className="flex space-x-4">
                 <a
-                  href="mailto:contact@Approvia.com"
+                  href="mailto:contact@BitCapro.com"
                   className="text-gray-400 hover:text-white transition-colors"
                 >
                   <Mail className="w-5 h-5" />
@@ -1277,18 +1264,10 @@ const LandingPage: React.FC = () => {
           <div className="border-t border-gray-800 pt-8">
             <div className="flex flex-col md:flex-row justify-between items-center">
               <p className="text-gray-400 mb-4 md:mb-0">
-                © 2024 Approvia. Built with modern technology for modern teams.
+                © 2024 BitCapro. Built with modern technology for modern teams.
               </p>
               <div className="flex items-center space-x-6">
-                <a
-                  href="https://bolt.new"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center text-blue-400 hover:text-blue-300 transition-colors"
-                >
-                  <Zap className="w-4 h-4 mr-1" />
-                  Built on Bolt
-                </a>
+                <BoltBadge variant="white" size="lg" backgroundContext="dark" />
               </div>
             </div>
           </div>

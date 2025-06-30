@@ -1,4 +1,4 @@
-// OpenAI API Integration for Approvia
+// OpenAI API Integration for BitCapro
 // This file handles AI-powered text generation and analysis
 
 export interface OpenAIResponse {

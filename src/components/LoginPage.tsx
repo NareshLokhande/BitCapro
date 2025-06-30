@@ -7,11 +7,11 @@ import {
   Lock,
   Mail,
   UserPlus,
-  Zap,
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import BoltBadge from './BoltBadge';
 
 const LoginPage: React.FC = () => {
   const { signIn, user, loading } = useAuth();
@@ -67,42 +67,42 @@ const LoginPage: React.FC = () => {
 
   const demoCredentials = [
     {
-      email: 'admin@Approvia.com',
+      email: 'admin@BitCapro.com',
       password: 'password123',
       role: 'Admin',
       name: 'System Administrator',
       department: 'IT',
     },
     {
-      email: 'ceo@Approvia.com',
+      email: 'ceo@BitCapro.com',
       password: 'password123',
       role: 'Approver_L4',
       name: 'Emily Davis',
       department: 'Executive',
     },
     {
-      email: 'cfo@Approvia.com',
+      email: 'cfo@BitCapro.com',
       password: 'password123',
       role: 'Approver_L3',
       name: 'Robert Chen',
       department: 'Finance',
     },
     {
-      email: 'director1@Approvia.com',
+      email: 'director1@BitCapro.com',
       password: 'password123',
       role: 'Approver_L2',
       name: 'Sarah Wilson',
       department: 'Operations',
     },
     {
-      email: 'manager1@Approvia.com',
+      email: 'manager1@BitCapro.com',
       password: 'password123',
       role: 'Approver_L1',
       name: 'Mike Johnson',
       department: 'Engineering',
     },
     {
-      email: 'john.doe@Approvia.com',
+      email: 'john.doe@BitCapro.com',
       password: 'password123',
       role: 'Submitter',
       name: 'John Doe',
@@ -163,19 +163,12 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      {/* Bolt Badge */}
-      <div className="fixed top-4 right-4 z-50">
-        <a
-          href="https://bolt.new"
-          title="Built on Bolt"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
-        >
-          <Zap className="w-4 h-4 mr-2" />
-          Built on Bolt
-        </a>
-      </div>
+      <BoltBadge
+        position="top-right"
+        variant="auto"
+        size="lg"
+        backgroundContext="light"
+      />
 
       <div className="max-w-6xl w-full space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -188,7 +181,7 @@ const LoginPage: React.FC = () => {
                 </div>
                 <div className="ml-4">
                   <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                    Approvia
+                    BitCapro
                   </h1>
                   <p className="text-gray-500">Investment Management</p>
                 </div>

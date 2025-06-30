@@ -196,7 +196,7 @@ const Layout: React.FC = () => {
       {!sidebarCollapsed && (
         <div className="ml-4">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            Approvia
+            BitCapro
           </h1>
           <p className="text-sm text-gray-500">Investment Management</p>
         </div>
