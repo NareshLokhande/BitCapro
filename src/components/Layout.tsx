@@ -44,6 +44,15 @@ const Layout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  // Debug logging
+  console.log('Layout component rendered, profile:', profile);
+  console.log('Profile details:', {
+    name: profile?.name,
+    role: profile?.role,
+    department: profile?.department,
+    id: profile?.id,
+  });
+
   // Navigation configuration
   const navigation: NavigationItem[] = [
     {
@@ -205,8 +214,40 @@ const Layout: React.FC = () => {
   );
 
   const renderUserInfo = () => {
-    if (!profile) return null;
+    console.log('renderUserInfo called, profile:', profile);
+    if (!profile) {
+      console.log('No profile available, showing loading state');
+      return (
+        <div
+          className={`py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 ${
+            sidebarCollapsed ? 'px-4' : 'px-6'
+          }`}
+        >
+          <div
+            className={`flex items-center ${
+              sidebarCollapsed ? 'justify-center' : ''
+            }`}
+          >
+            <div className="w-10 h-10 bg-gradient-to-br from-gray-300 to-gray-400 rounded-xl flex items-center justify-center shadow-md animate-pulse">
+              <span className="text-sm font-semibold text-white">...</span>
+            </div>
+            {!sidebarCollapsed && (
+              <div className="ml-3">
+                <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
+                <div className="h-3 bg-gray-200 rounded animate-pulse w-20"></div>
+              </div>
+            )}
+          </div>
+          {!sidebarCollapsed && (
+            <div className="mt-2">
+              <div className="h-5 bg-gray-200 rounded-full animate-pulse w-24"></div>
+            </div>
+          )}
+        </div>
+      );
+    }
 
+    console.log('Rendering user info for:', profile.name);
     return (
       <div
         className={`py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 ${

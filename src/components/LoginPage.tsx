@@ -22,7 +22,7 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isCreatingUsers, setIsCreatingUsers] = useState(false);
+  // const [isCreatingUsers, setIsCreatingUsers] = useState(false);
   const [creationStatus, setCreationStatus] = useState<string>('');
 
   const from = location.state?.from?.pathname || '/app/dashboard';
@@ -67,42 +67,42 @@ const LoginPage: React.FC = () => {
 
   const demoCredentials = [
     {
-      email: 'admin@BitCapro.com',
+      email: 'admin@bitcapro.com',
       password: 'password123',
       role: 'Admin',
       name: 'System Administrator',
       department: 'IT',
     },
     {
-      email: 'ceo@BitCapro.com',
+      email: 'ceo@bitcapro.com',
       password: 'password123',
       role: 'Approver_L4',
       name: 'Emily Davis',
       department: 'Executive',
     },
     {
-      email: 'cfo@BitCapro.com',
+      email: 'cfo@bitcapro.com',
       password: 'password123',
       role: 'Approver_L3',
       name: 'Robert Chen',
       department: 'Finance',
     },
     {
-      email: 'director1@BitCapro.com',
+      email: 'director1@bitcapro.com',
       password: 'password123',
       role: 'Approver_L2',
       name: 'Sarah Wilson',
       department: 'Operations',
     },
     {
-      email: 'manager1@BitCapro.com',
+      email: 'manager1@bitcapro.com',
       password: 'password123',
       role: 'Approver_L1',
       name: 'Mike Johnson',
       department: 'Engineering',
     },
     {
-      email: 'john.doe@BitCapro.com',
+      email: 'john.doe@bitcapro.com',
       password: 'password123',
       role: 'Submitter',
       name: 'John Doe',
@@ -310,7 +310,7 @@ const LoginPage: React.FC = () => {
 
           {/* Demo Credentials */}
           <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-8">
-            <div className="flex items-center justify-between mb-6">
+            {/* <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-900">
                 Demo Credentials
               </h3>
@@ -331,9 +331,9 @@ const LoginPage: React.FC = () => {
                   </>
                 )}
               </button>
-            </div>
+            </div> */}
 
-            <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
+            {/* <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
               <div className="flex items-start">
                 <AlertCircle className="w-5 h-5 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-yellow-800">
@@ -345,9 +345,9 @@ const LoginPage: React.FC = () => {
                   </p>
                 </div>
               </div>
-            </div>
+            </div> */}
 
-            <div className="mb-4 p-3 bg-blue-100 border border-blue-300 rounded-lg">
+            {/* <div className="mb-4 p-3 bg-blue-100 border border-blue-300 rounded-lg">
               <div className="flex items-start">
                 <Clock className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-blue-800">
@@ -359,7 +359,7 @@ const LoginPage: React.FC = () => {
                   </p>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             <p className="text-gray-600 mb-6">
               Click on any credential below to auto-fill the login form and test

@@ -271,25 +271,14 @@ const LandingPage: React.FC = () => {
 
       {/* Video Modal */}
       {isVideoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 backdrop-blur-sm">
-          <div className="relative max-w-4xl w-full mx-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 backdrop-blur-sm p-4">
+          <div className="relative max-w-6xl w-full max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsVideoModalOpen(false)}
-              className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors"
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors z-10"
             >
               <X className="w-8 h-8" />
             </button>
-            <div className="bg-white rounded-2xl overflow-hidden shadow-2xl">
-              <div className="aspect-video bg-gray-900 flex items-center justify-center">
-                <div className="text-center text-white">
-                  <Play className="w-16 h-16 mx-auto mb-4" />
-                  <p className="text-lg">Demo Video Coming Soon</p>
-                  <p className="text-gray-400">
-                    Interactive demo will be available here
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -617,9 +606,9 @@ const LandingPage: React.FC = () => {
               })}
             </div>
 
-            {/* Feature Preview */}
-            <div className="relative lg:sticky lg:top-8">
-              <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-3xl p-8 border border-gray-200 shadow-xl">
+            {/* Feature Preview - Centered Vertically */}
+            <div className="relative lg:sticky lg:top-0 lg:h-screen lg:flex lg:items-center">
+              <div className="w-full bg-gradient-to-br from-gray-50 to-blue-50 rounded-3xl p-8 border border-gray-200 shadow-xl">
                 <div className="text-center mb-8">
                   <div className="flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl mx-auto mb-6 shadow-lg">
                     {(() => {
