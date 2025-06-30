@@ -66,10 +66,9 @@ npm run dev
 
 1. **Authentication:** Sign up/login with test users
 2. **Submit Request:** Create a new investment request
-3. **File Upload:** Test document upload functionality
-4. **Approval Flow:** Test approval workflow
-5. **AI Insights:** Test AI-powered analysis (if OpenAI configured)
-6. **Notifications:** Test Slack/email notifications (if configured)
+3. **Approval Flow:** Test approval workflow
+4. **AI Insights:** Test AI-powered analysis (if OpenAI configured)
+5. **Notifications:** Test Slack/email notifications (if configured)
 
 ## 🔧 Configuration Details
 
@@ -103,10 +102,10 @@ USING (bucket_id = 'investment-documents');
 
 The migrations create these test users:
 
-- `admin@approvia.com` / `password123` (Admin)
-- `ceo@approvia.com` / `password123` (CEO)
-- `cfo@approvia.com` / `password123` (CFO)
-- `john.doe@approvia.com` / `password123` (Submitter)
+- `admin@Approvia.com` / `password123` (Admin)
+- `ceo@Approvia.com` / `password123` (CEO)
+- `cfo@Approvia.com` / `password123` (CFO)
+- `john.doe@Approvia.com` / `password123` (Submitter)
 
 ## 🚨 Common Issues & Solutions
 
@@ -181,7 +180,6 @@ Check browser console for:
 
 - API errors
 - Authentication issues
-- File upload problems
 
 ## 🔒 Security Checklist
 
@@ -191,7 +189,6 @@ Check browser console for:
 - [ ] API keys not exposed in client code
 - [ ] HTTPS enabled in production
 - [ ] Authentication flow tested
-- [ ] File upload security verified
 
 ## 📞 Support
 

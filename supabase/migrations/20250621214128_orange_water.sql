@@ -12,12 +12,12 @@
     - Ensures approval workflow integrity
 
   3. Demo Credentials
-    - admin@approvia.com / password123 (Admin - can manage everything)
-    - ceo@approvia.com / password123 (Approver_L4 - CEO level approval)
-    - cfo@approvia.com / password123 (Approver_L3 - CFO level approval)
-    - director1@approvia.com / password123 (Approver_L2 - Director level)
-    - manager1@approvia.com / password123 (Approver_L1 - Manager level)
-    - john.doe@approvia.com / password123 (Submitter - can submit requests)
+    - admin@Approvia.com / password123 (Admin - can manage everything)
+    - ceo@Approvia.com / password123 (Approver_L4 - CEO level approval)
+    - cfo@Approvia.com / password123 (Approver_L3 - CFO level approval)
+    - director1@Approvia.com / password123 (Approver_L2 - Director level)
+    - manager1@Approvia.com / password123 (Approver_L1 - Manager level)
+    - john.doe@Approvia.com / password123 (Submitter - can submit requests)
 */
 
 -- Temporarily disable the trigger to avoid conflicts
@@ -27,7 +27,7 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DO $$
 BEGIN
   -- Admin user
-  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'admin@approvia.com') THEN
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'admin@Approvia.com') THEN
     INSERT INTO auth.users (
       id,
       instance_id,
@@ -44,7 +44,7 @@ BEGIN
     ) VALUES (
       '00000000-0000-0000-0000-000000000001',
       '00000000-0000-0000-0000-000000000000',
-      'admin@approvia.com',
+      'admin@Approvia.com',
       crypt('password123', gen_salt('bf')),
       now(),
       now(),
@@ -58,7 +58,7 @@ BEGIN
   END IF;
 
   -- CEO user
-  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'ceo@approvia.com') THEN
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'ceo@Approvia.com') THEN
     INSERT INTO auth.users (
       id,
       instance_id,
@@ -75,7 +75,7 @@ BEGIN
     ) VALUES (
       '00000000-0000-0000-0000-000000000002',
       '00000000-0000-0000-0000-000000000000',
-      'ceo@approvia.com',
+      'ceo@Approvia.com',
       crypt('password123', gen_salt('bf')),
       now(),
       now(),
@@ -89,7 +89,7 @@ BEGIN
   END IF;
 
   -- CFO user
-  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'cfo@approvia.com') THEN
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'cfo@Approvia.com') THEN
     INSERT INTO auth.users (
       id,
       instance_id,
@@ -106,7 +106,7 @@ BEGIN
     ) VALUES (
       '00000000-0000-0000-0000-000000000003',
       '00000000-0000-0000-0000-000000000000',
-      'cfo@approvia.com',
+      'cfo@Approvia.com',
       crypt('password123', gen_salt('bf')),
       now(),
       now(),
@@ -120,7 +120,7 @@ BEGIN
   END IF;
 
   -- Director user
-  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'director1@approvia.com') THEN
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'director1@Approvia.com') THEN
     INSERT INTO auth.users (
       id,
       instance_id,
@@ -137,7 +137,7 @@ BEGIN
     ) VALUES (
       '00000000-0000-0000-0000-000000000004',
       '00000000-0000-0000-0000-000000000000',
-      'director1@approvia.com',
+      'director1@Approvia.com',
       crypt('password123', gen_salt('bf')),
       now(),
       now(),
@@ -151,7 +151,7 @@ BEGIN
   END IF;
 
   -- Manager user
-  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'manager1@approvia.com') THEN
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'manager1@Approvia.com') THEN
     INSERT INTO auth.users (
       id,
       instance_id,
@@ -168,7 +168,7 @@ BEGIN
     ) VALUES (
       '00000000-0000-0000-0000-000000000005',
       '00000000-0000-0000-0000-000000000000',
-      'manager1@approvia.com',
+      'manager1@Approvia.com',
       crypt('password123', gen_salt('bf')),
       now(),
       now(),
@@ -182,7 +182,7 @@ BEGIN
   END IF;
 
   -- Submitter user
-  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'john.doe@approvia.com') THEN
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'john.doe@Approvia.com') THEN
     INSERT INTO auth.users (
       id,
       instance_id,
@@ -199,7 +199,7 @@ BEGIN
     ) VALUES (
       '00000000-0000-0000-0000-000000000006',
       '00000000-0000-0000-0000-000000000000',
-      'john.doe@approvia.com',
+      'john.doe@Approvia.com',
       crypt('password123', gen_salt('bf')),
       now(),
       now(),
@@ -218,24 +218,24 @@ DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users' AND table_schema = 'public') THEN
     INSERT INTO users (id, email, created_at, updated_at) VALUES
-      ('00000000-0000-0000-0000-000000000001', 'admin@approvia.com', now(), now()),
-      ('00000000-0000-0000-0000-000000000002', 'ceo@approvia.com', now(), now()),
-      ('00000000-0000-0000-0000-000000000003', 'cfo@approvia.com', now(), now()),
-      ('00000000-0000-0000-0000-000000000004', 'director1@approvia.com', now(), now()),
-      ('00000000-0000-0000-0000-000000000005', 'manager1@approvia.com', now(), now()),
-      ('00000000-0000-0000-0000-000000000006', 'john.doe@approvia.com', now(), now())
+      ('00000000-0000-0000-0000-000000000001', 'admin@Approvia.com', now(), now()),
+      ('00000000-0000-0000-0000-000000000002', 'ceo@Approvia.com', now(), now()),
+      ('00000000-0000-0000-0000-000000000003', 'cfo@Approvia.com', now(), now()),
+      ('00000000-0000-0000-0000-000000000004', 'director1@Approvia.com', now(), now()),
+      ('00000000-0000-0000-0000-000000000005', 'manager1@Approvia.com', now(), now()),
+      ('00000000-0000-0000-0000-000000000006', 'john.doe@Approvia.com', now(), now())
     ON CONFLICT (id) DO NOTHING;
   END IF;
 END $$;
 
 -- Insert user profiles with proper roles and hierarchy
 INSERT INTO user_profiles (user_id, email, name, role, department, active) VALUES
-  ('00000000-0000-0000-0000-000000000001', 'admin@approvia.com', 'System Administrator', 'Admin', 'IT', true),
-  ('00000000-0000-0000-0000-000000000002', 'ceo@approvia.com', 'Emily Davis', 'Approver_L4', 'Executive', true),
-  ('00000000-0000-0000-0000-000000000003', 'cfo@approvia.com', 'Robert Chen', 'Approver_L3', 'Finance', true),
-  ('00000000-0000-0000-0000-000000000004', 'director1@approvia.com', 'Sarah Wilson', 'Approver_L2', 'Operations', true),
-  ('00000000-0000-0000-0000-000000000005', 'manager1@approvia.com', 'Mike Johnson', 'Approver_L1', 'Operations', true),
-  ('00000000-0000-0000-0000-000000000006', 'john.doe@approvia.com', 'John Doe', 'Submitter', 'Engineering', true)
+  ('00000000-0000-0000-0000-000000000001', 'admin@Approvia.com', 'System Administrator', 'Admin', 'IT', true),
+  ('00000000-0000-0000-0000-000000000002', 'ceo@Approvia.com', 'Emily Davis', 'Approver_L4', 'Executive', true),
+  ('00000000-0000-0000-0000-000000000003', 'cfo@Approvia.com', 'Robert Chen', 'Approver_L3', 'Finance', true),
+  ('00000000-0000-0000-0000-000000000004', 'director1@Approvia.com', 'Sarah Wilson', 'Approver_L2', 'Operations', true),
+  ('00000000-0000-0000-0000-000000000005', 'manager1@Approvia.com', 'Mike Johnson', 'Approver_L1', 'Operations', true),
+  ('00000000-0000-0000-0000-000000000006', 'john.doe@Approvia.com', 'John Doe', 'Submitter', 'Engineering', true)
 ON CONFLICT (email) DO UPDATE SET
   user_id = EXCLUDED.user_id,
   name = EXCLUDED.name,

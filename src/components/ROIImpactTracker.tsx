@@ -1,45 +1,38 @@
-import React, { useState, useMemo } from 'react';
 import {
-  TrendingDown,
-  TrendingUp,
-  AlertTriangle,
-  Clock,
-  DollarSign,
-  Target,
-  Calendar,
   BarChart3,
-  LineChart,
-  Zap,
-  Filter,
-  Info,
   ChevronDown,
   ChevronUp,
-  ArrowRight
+  Clock,
+  DollarSign,
+  Info,
+  LineChart,
+  Target,
+  TrendingDown,
+  Zap,
 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
 import {
-  LineChart as RechartsLineChart,
-  Line,
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  Legend,
-  ScatterChart,
-  Scatter
 } from 'recharts';
-import { useInvestmentRequests, useApprovalLogs, useKPIs } from '../hooks/useSupabase';
+import {
+  useApprovalLogs,
+  useInvestmentRequests,
+  useKPIs,
+} from '../hooks/useSupabase';
 import {
   ROIImpactCalculator,
-  ROIImpactData,
-  ROITimelinePoint,
   calculateDynamicDecayRate,
-  getROIImpactSeverity
+  getROIImpactSeverity,
 } from '../lib/roiImpactCalculator';
+import StyledDropdown from './StyledDropdown';
 
 interface ROIImpactTrackerProps {
   selectedBusinessCase?: string;
@@ -50,50 +43,87 @@ interface ROIImpactTrackerProps {
 const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
   selectedBusinessCase = 'All',
   selectedDepartment = 'All',
-  timeRange = '90'
+  timeRange = '90',
 }) => {
   const { requests, loading: requestsLoading } = useInvestmentRequests();
   const { logs, loading: logsLoading } = useApprovalLogs();
   const { kpis, loading: kpisLoading } = useKPIs();
-  
+
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [showDetailedView, setShowDetailedView] = useState(false);
-  const [sortBy, setSortBy] = useState<'delay' | 'roiLoss' | 'valueLost'>('roiLoss');
+  const [sortBy, setSortBy] = useState<'delay' | 'roiLoss' | 'valueLost'>(
+    'roiLoss',
+  );
+
+  // Filter states
+  const [businessCaseFilter, setBusinessCaseFilter] =
+    useState(selectedBusinessCase);
+  const [departmentFilter, setDepartmentFilter] = useState(selectedDepartment);
+  const [timeRangeFilter, setTimeRangeFilter] = useState(timeRange);
+
+  // Get unique values for filters
+  const uniqueBusinessCases = useMemo(() => {
+    return [
+      'All',
+      ...Array.from(
+        new Set(requests.flatMap((req) => req.business_case_type || [])),
+      ),
+    ];
+  }, [requests]);
+
+  const uniqueDepartments = useMemo(() => {
+    return [
+      'All',
+      ...Array.from(new Set(requests.map((req) => req.department))),
+    ];
+  }, [requests]);
 
   // Calculate ROI impact data
   const roiImpactData = useMemo(() => {
     if (!requests.length || !logs.length || !kpis.length) return [];
 
     const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - parseInt(timeRange));
+    cutoffDate.setDate(cutoffDate.getDate() - parseInt(timeRangeFilter));
 
     return requests
-      .filter(request => {
+      .filter((request) => {
         if (new Date(request.submitted_date) < cutoffDate) return false;
-        if (selectedBusinessCase !== 'All' && !request.business_case_type?.includes(selectedBusinessCase)) return false;
-        if (selectedDepartment !== 'All' && request.department !== selectedDepartment) return false;
+        if (
+          businessCaseFilter !== 'All' &&
+          !request.business_case_type?.includes(businessCaseFilter)
+        )
+          return false;
+        if (
+          departmentFilter !== 'All' &&
+          request.department !== departmentFilter
+        )
+          return false;
         return true;
       })
-      .map(request => {
+      .map((request) => {
         // Get KPI data for original ROI
-        const requestKPIs = kpis.filter(kpi => kpi.request_id === request.id);
+        const requestKPIs = kpis.filter((kpi) => kpi.request_id === request.id);
         const originalROI = requestKPIs.length > 0 ? requestKPIs[0].irr : 15; // Default 15% if no KPI
 
         // Get approval timeline
         const requestLogs = logs
-          .filter(log => log.request_id === request.id)
-          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+          .filter((log) => log.request_id === request.id)
+          .sort(
+            (a, b) =>
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+          );
 
-        const finalApprovalDate = requestLogs.find(log => 
-          log.status === 'Approved' || log.status === 'Rejected'
-        )?.timestamp || null;
+        const finalApprovalDate =
+          requestLogs.find(
+            (log) => log.status === 'Approved' || log.status === 'Rejected',
+          )?.timestamp || null;
 
         // Calculate dynamic decay rate
         const decayRate = calculateDynamicDecayRate(
           request.base_currency_capex + request.base_currency_opex,
           request.business_case_type || [],
           request.department,
-          request.priority
+          request.priority,
         );
 
         // Calculate ROI impact
@@ -102,7 +132,7 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
           request.submitted_date,
           finalApprovalDate,
           request.base_currency_capex + request.base_currency_opex,
-          decayRate
+          decayRate,
         );
 
         return {
@@ -112,9 +142,14 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
           department: request.department,
           priority: request.priority,
           businessCaseTypes: request.business_case_type || [],
-          status: request.status,
-          investmentAmount: request.base_currency_capex + request.base_currency_opex,
-          currency: request.currency
+          status: (request.status === 'Approved'
+            ? 'approved'
+            : request.status === 'Rejected'
+            ? 'rejected'
+            : 'pending') as 'approved' | 'rejected' | 'pending',
+          investmentAmount:
+            request.base_currency_capex + request.base_currency_opex,
+          currency: request.currency,
         };
       })
       .sort((a, b) => {
@@ -129,7 +164,15 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
             return b.roiLoss - a.roiLoss;
         }
       });
-  }, [requests, logs, kpis, timeRange, selectedBusinessCase, selectedDepartment, sortBy]);
+  }, [
+    requests,
+    logs,
+    kpis,
+    timeRangeFilter,
+    businessCaseFilter,
+    departmentFilter,
+    sortBy,
+  ]);
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -141,8 +184,8 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
     if (roiImpactData.length === 0) return [];
 
     // Get the request with the most significant ROI loss for timeline display
-    const significantRequest = roiImpactData.reduce((prev, current) => 
-      current.roiLoss > prev.roiLoss ? current : prev
+    const significantRequest = roiImpactData.reduce((prev, current) =>
+      current.roiLoss > prev.roiLoss ? current : prev,
     );
 
     if (!significantRequest) return [];
@@ -150,28 +193,31 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
     return ROIImpactCalculator.generateROITimeline(
       significantRequest.originalROI,
       significantRequest.submissionDate,
-      significantRequest.finalApprovalDate,
-      significantRequest.decayRate
+      significantRequest.finalApprovalDate || null,
+      significantRequest.decayRate,
     );
   }, [roiImpactData]);
 
   // Aggregate data for department comparison
   const departmentImpactData = useMemo(() => {
-    const deptData: Record<string, {
-      totalRequests: number;
-      averageDelay: number;
-      totalROILoss: number;
-      totalValueLost: number;
-    }> = {};
+    const deptData: Record<
+      string,
+      {
+        totalRequests: number;
+        averageDelay: number;
+        totalROILoss: number;
+        totalValueLost: number;
+      }
+    > = {};
 
-    roiImpactData.forEach(impact => {
+    roiImpactData.forEach((impact) => {
       const dept = impact.department || 'Unknown';
       if (!deptData[dept]) {
         deptData[dept] = {
           totalRequests: 0,
           averageDelay: 0,
           totalROILoss: 0,
-          totalValueLost: 0
+          totalValueLost: 0,
         };
       }
 
@@ -184,7 +230,7 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
     return Object.entries(deptData).map(([department, data]) => ({
       department,
       ...data,
-      averageDelay: data.averageDelay / data.totalRequests
+      averageDelay: data.averageDelay / data.totalRequests,
     }));
   }, [roiImpactData]);
 
@@ -208,7 +254,9 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
             <TrendingDown className="w-8 h-8 mr-3" />
             <div>
               <h3 className="text-xl font-bold">ROI Impact Tracker</h3>
-              <p className="text-red-100">Monitor how approval delays affect investment returns</p>
+              <p className="text-red-100">
+                Monitor how approval delays affect investment returns
+              </p>
             </div>
           </div>
           <div className="text-right">
@@ -239,9 +287,13 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">ROI Decay Rate</p>
+              <p className="text-sm font-medium text-gray-600">
+                ROI Decay Rate
+              </p>
               <p className="text-2xl font-bold text-red-600 mt-1">
-                {ROIImpactCalculator.formatPercentage(summaryStats.averageROIDecay)}
+                {ROIImpactCalculator.formatPercentage(
+                  summaryStats.averageROIDecay,
+                )}
               </p>
               <p className="text-xs text-gray-500">per request</p>
             </div>
@@ -256,7 +308,9 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
             <div>
               <p className="text-sm font-medium text-gray-600">Value Lost</p>
               <p className="text-2xl font-bold text-red-600 mt-1">
-                {ROIImpactCalculator.formatCurrency(summaryStats.totalValueLost)}
+                {ROIImpactCalculator.formatCurrency(
+                  summaryStats.totalValueLost,
+                )}
               </p>
             </div>
             <div className="flex items-center justify-center w-12 h-12 bg-red-50 rounded-xl">
@@ -268,7 +322,9 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Fastest Approval</p>
+              <p className="text-sm font-medium text-gray-600">
+                Fastest Approval
+              </p>
               <p className="text-2xl font-bold text-green-600 mt-1">
                 {summaryStats.fastestApproval.toFixed(1)} weeks
               </p>
@@ -283,7 +339,9 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
       {/* Controls */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-semibold text-gray-900">Analysis Controls</h4>
+          <h4 className="text-lg font-semibold text-gray-900">
+            Analysis Controls
+          </h4>
           <button
             onClick={() => setShowDetailedView(!showDetailedView)}
             className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -292,70 +350,242 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
             {showDetailedView ? 'Hide Details' : 'Show Details'}
           </button>
         </div>
-        
-        <div className="flex items-center gap-4">
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
-            <select
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Business Case Type
+            </label>
+            <StyledDropdown
+              value={businessCaseFilter}
+              onChange={(e) => setBusinessCaseFilter(e.target.value)}
+              placeholder="All Business Cases"
+            >
+              {uniqueBusinessCases.map((caseType) => (
+                <option key={caseType} value={caseType}>
+                  {caseType}
+                </option>
+              ))}
+            </StyledDropdown>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Department
+            </label>
+            <StyledDropdown
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+              placeholder="All Departments"
+            >
+              {uniqueDepartments.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </StyledDropdown>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Time Range
+            </label>
+            <StyledDropdown
+              value={timeRangeFilter}
+              onChange={(e) => setTimeRangeFilter(e.target.value)}
+              placeholder="Time Range"
+            >
+              <option value="30">Last 30 Days</option>
+              <option value="90">Last 90 Days</option>
+              <option value="180">Last 6 Months</option>
+              <option value="365">Last 12 Months</option>
+            </StyledDropdown>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sort By
+            </label>
+            <StyledDropdown
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              onChange={(e) =>
+                setSortBy(e.target.value as 'delay' | 'roiLoss' | 'valueLost')
+              }
             >
               <option value="roiLoss">ROI Loss</option>
               <option value="delay">Delay Time</option>
               <option value="valueLost">Value Lost</option>
-            </select>
+            </StyledDropdown>
           </div>
-          
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex-1">
-            <div className="flex items-start">
-              <Info className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-blue-800">
-                <p className="font-medium mb-1">ROI Decay Formula</p>
-                <p>ROI(d) = ROI₀ - (r × d), where d = delay in weeks, r = decay rate (0.1-2% per week based on project characteristics)</p>
-              </div>
+        </div>
+
+        {/* Filter Summary and Clear Button */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Active Filters:</span>
+            {businessCaseFilter !== 'All' && (
+              <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                Business Case: {businessCaseFilter}
+              </span>
+            )}
+            {departmentFilter !== 'All' && (
+              <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                Department: {departmentFilter}
+              </span>
+            )}
+            <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+              Time: {timeRangeFilter} days
+            </span>
+            <span className="inline-flex items-center px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
+              Showing {roiImpactData.length} requests
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setBusinessCaseFilter('All');
+              setDepartmentFilter('All');
+              setTimeRangeFilter('90');
+              setSortBy('roiLoss');
+            }}
+            className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            Clear Filters
+          </button>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="flex items-start">
+            <Info className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-blue-800">
+              <p className="font-medium mb-1">ROI Decay Formula</p>
+              <p>
+                ROI(d) = ROI₀ - (r × d), where d = delay in weeks, r = decay
+                rate (0.1-2% per week based on project characteristics)
+              </p>
             </div>
           </div>
         </div>
+
+        {/* Debug Information */}
+        {showDetailedView && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <h5 className="font-medium text-gray-900 mb-2">
+              Calculation Details
+            </h5>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-gray-600">Total Requests Analyzed:</p>
+                <p className="font-medium">{roiImpactData.length}</p>
+              </div>
+              <div>
+                <p className="text-gray-600">Average Decay Rate:</p>
+                <p className="font-medium">
+                  {roiImpactData.length > 0
+                    ? (
+                        roiImpactData.reduce(
+                          (sum, item) => sum + item.decayRate,
+                          0,
+                        ) / roiImpactData.length
+                      ).toFixed(2)
+                    : '0.00'}
+                  % per week
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-600">Total Investment Analyzed:</p>
+                <p className="font-medium">
+                  {ROIImpactCalculator.formatCurrency(
+                    roiImpactData.reduce(
+                      (sum, item) => sum + item.investmentAmount,
+                      0,
+                    ),
+                  )}
+                </p>
+              </div>
+            </div>
+            {roiImpactData.length > 0 && (
+              <div className="mt-3 p-3 bg-white rounded border">
+                <p className="text-xs text-gray-600 mb-2">
+                  Sample Calculation:
+                </p>
+                <div className="text-xs space-y-1">
+                  <p>
+                    <strong>Request:</strong> {roiImpactData[0].projectTitle}
+                  </p>
+                  <p>
+                    <strong>Original ROI:</strong>{' '}
+                    {roiImpactData[0].originalROI.toFixed(2)}%
+                  </p>
+                  <p>
+                    <strong>Delay:</strong>{' '}
+                    {roiImpactData[0].delayInWeeks.toFixed(1)} weeks
+                  </p>
+                  <p>
+                    <strong>Decay Rate:</strong>{' '}
+                    {roiImpactData[0].decayRate.toFixed(2)}% per week
+                  </p>
+                  <p>
+                    <strong>ROI Loss:</strong>{' '}
+                    {roiImpactData[0].roiLoss.toFixed(2)}%
+                  </p>
+                  <p>
+                    <strong>Value Lost:</strong>{' '}
+                    {ROIImpactCalculator.formatCurrency(
+                      roiImpactData[0].lostValue,
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ROI Timeline Chart */}
       {timelineChartData.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-6">
-            <h4 className="text-lg font-semibold text-gray-900">ROI Decay Timeline</h4>
+            <h4 className="text-lg font-semibold text-gray-900">
+              ROI Decay Timeline
+            </h4>
             <LineChart className="w-5 h-5 text-gray-400" />
           </div>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={timelineChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="date" 
+                <XAxis
+                  dataKey="date"
                   tick={{ fontSize: 12 }}
-                  tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                  tickFormatter={(value) =>
+                    new Date(value).toLocaleDateString()
+                  }
                 />
                 <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip 
+                <Tooltip
                   formatter={(value: number, name: string) => [
-                    name === 'roi' ? `${value.toFixed(2)}%` : `${value.toFixed(2)}%`,
-                    name === 'roi' ? 'Current ROI' : 'Cumulative Loss'
+                    name === 'roi'
+                      ? `${value.toFixed(2)}%`
+                      : `${value.toFixed(2)}%`,
+                    name === 'roi' ? 'Current ROI' : 'Cumulative Loss',
                   ]}
-                  labelFormatter={(value) => `Date: ${new Date(value).toLocaleDateString()}`}
+                  labelFormatter={(value) =>
+                    `Date: ${new Date(value).toLocaleDateString()}`
+                  }
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="roi" 
-                  stroke="#3B82F6" 
-                  fill="#3B82F6" 
+                <Area
+                  type="monotone"
+                  dataKey="roi"
+                  stroke="#3B82F6"
+                  fill="#3B82F6"
                   fillOpacity={0.1}
                   strokeWidth={2}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="cumulativeLoss" 
-                  stroke="#EF4444" 
-                  fill="#EF4444" 
+                <Area
+                  type="monotone"
+                  dataKey="cumulativeLoss"
+                  stroke="#EF4444"
+                  fill="#EF4444"
                   fillOpacity={0.1}
                   strokeWidth={2}
                 />
@@ -369,7 +599,9 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
       {departmentImpactData.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-6">
-            <h4 className="text-lg font-semibold text-gray-900">Department Impact Comparison</h4>
+            <h4 className="text-lg font-semibold text-gray-900">
+              Department Impact Comparison
+            </h4>
             <BarChart3 className="w-5 h-5 text-gray-400" />
           </div>
           <div className="h-80">
@@ -378,18 +610,32 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="department" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip 
+                <Tooltip
                   formatter={(value: number, name: string) => [
-                    name === 'totalROILoss' ? `${value.toFixed(2)}%` : 
-                    name === 'averageDelay' ? `${value.toFixed(1)} weeks` :
-                    ROIImpactCalculator.formatCurrency(value),
-                    name === 'totalROILoss' ? 'Total ROI Loss' :
-                    name === 'averageDelay' ? 'Average Delay' :
-                    name === 'totalValueLost' ? 'Total Value Lost' : name
+                    name === 'totalROILoss'
+                      ? `${value.toFixed(2)}%`
+                      : name === 'averageDelay'
+                      ? `${value.toFixed(1)} weeks`
+                      : ROIImpactCalculator.formatCurrency(value),
+                    name === 'totalROILoss'
+                      ? 'Total ROI Loss'
+                      : name === 'averageDelay'
+                      ? 'Average Delay'
+                      : name === 'totalValueLost'
+                      ? 'Total Value Lost'
+                      : name,
                   ]}
                 />
-                <Bar dataKey="totalROILoss" fill="#EF4444" name="Total ROI Loss" />
-                <Bar dataKey="averageDelay" fill="#F59E0B" name="Average Delay" />
+                <Bar
+                  dataKey="totalROILoss"
+                  fill="#EF4444"
+                  name="Total ROI Loss"
+                />
+                <Bar
+                  dataKey="averageDelay"
+                  fill="#F59E0B"
+                  name="Average Delay"
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -399,21 +645,28 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
       {/* Detailed Request Analysis */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="px-6 py-4 border-b border-gray-100">
-          <h4 className="text-lg font-semibold text-gray-900">Request ROI Impact Analysis</h4>
+          <h4 className="text-lg font-semibold text-gray-900">
+            Request ROI Impact Analysis
+          </h4>
           <p className="text-sm text-gray-600 mt-1">
             Showing {roiImpactData.length} requests with ROI impact analysis
           </p>
         </div>
-        
+
         <div className="p-6 space-y-4">
           {roiImpactData.map((impact) => {
             const severity = getROIImpactSeverity(impact.roiLossPercentage);
             const isExpanded = expandedRequest === impact.requestId;
-            
+
             return (
-              <div key={impact.requestId} className="border border-gray-200 rounded-lg">
+              <div
+                key={impact.requestId}
+                className="border border-gray-200 rounded-lg"
+              >
                 <button
-                  onClick={() => setExpandedRequest(isExpanded ? null : impact.requestId)}
+                  onClick={() =>
+                    setExpandedRequest(isExpanded ? null : impact.requestId)
+                  }
                   className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center flex-1">
@@ -421,19 +674,25 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
                       <TrendingDown className="w-5 h-5 text-gray-600" />
                     </div>
                     <div className="flex-1">
-                      <h5 className="font-medium text-gray-900">{impact.projectTitle}</h5>
+                      <h5 className="font-medium text-gray-900">
+                        {impact.projectTitle}
+                      </h5>
                       <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
                         <span>{impact.department}</span>
                         <span>•</span>
-                        <span>{impact.delayInWeeks.toFixed(1)} weeks delay</span>
+                        <span>
+                          {impact.delayInWeeks.toFixed(1)} weeks delay
+                        </span>
                         <span>•</span>
                         <span className="font-medium text-red-600">
-                          -{ROIImpactCalculator.formatPercentage(impact.roiLoss)} ROI
+                          -
+                          {ROIImpactCalculator.formatPercentage(impact.roiLoss)}{' '}
+                          ROI
                         </span>
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <div className="text-lg font-bold text-red-600">
@@ -441,115 +700,181 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
                       </div>
                       <div className="text-sm text-gray-500">Value Lost</div>
                     </div>
-                    
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${severity.color}`}>
+
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${severity.color}`}
+                    >
                       {severity.level}
                     </span>
-                    
-                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+
+                    {isExpanded ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
                   </div>
                 </button>
-                
+
                 {isExpanded && (
                   <div className="px-4 pb-4 border-t border-gray-200 bg-gray-50">
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-3">
-                        <h6 className="font-medium text-gray-900">ROI Analysis</h6>
+                        <h6 className="font-medium text-gray-900">
+                          ROI Analysis
+                        </h6>
                         <div className="space-y-2">
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Original ROI:</span>
+                            <span className="text-sm text-gray-600">
+                              Original ROI:
+                            </span>
                             <span className="text-sm font-medium text-gray-900">
-                              {ROIImpactCalculator.formatPercentage(impact.originalROI)}
+                              {ROIImpactCalculator.formatPercentage(
+                                impact.originalROI,
+                              )}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Current ROI:</span>
+                            <span className="text-sm text-gray-600">
+                              Current ROI:
+                            </span>
                             <span className="text-sm font-medium text-gray-900">
-                              {ROIImpactCalculator.formatPercentage(impact.adjustedROI)}
+                              {ROIImpactCalculator.formatPercentage(
+                                impact.adjustedROI,
+                              )}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">ROI Loss:</span>
+                            <span className="text-sm text-gray-600">
+                              ROI Loss:
+                            </span>
                             <span className="text-sm font-medium text-red-600">
-                              -{ROIImpactCalculator.formatPercentage(impact.roiLoss)}
+                              -
+                              {ROIImpactCalculator.formatPercentage(
+                                impact.roiLoss,
+                              )}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Decay Rate:</span>
+                            <span className="text-sm text-gray-600">
+                              Decay Rate:
+                            </span>
                             <span className="text-sm font-medium text-gray-900">
-                              {ROIImpactCalculator.formatPercentage(impact.decayRate)}/week
+                              {ROIImpactCalculator.formatPercentage(
+                                impact.decayRate,
+                              )}
+                              /week
                             </span>
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="space-y-3">
                         <h6 className="font-medium text-gray-900">Timeline</h6>
                         <div className="space-y-2">
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Submitted:</span>
+                            <span className="text-sm text-gray-600">
+                              Submitted:
+                            </span>
                             <span className="text-sm font-medium text-gray-900">
-                              {new Date(impact.submissionDate).toLocaleDateString()}
+                              {new Date(
+                                impact.submissionDate,
+                              ).toLocaleDateString()}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Status:</span>
-                            <span className="text-sm font-medium text-gray-900">{impact.status}</span>
+                            <span className="text-sm text-gray-600">
+                              Status:
+                            </span>
+                            <span className="text-sm font-medium text-gray-900">
+                              {impact.status}
+                            </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Delay:</span>
+                            <span className="text-sm text-gray-600">
+                              Delay:
+                            </span>
                             <span className="text-sm font-medium text-orange-600">
                               {impact.delayInWeeks.toFixed(1)} weeks
                             </span>
                           </div>
                           {impact.finalApprovalDate && (
                             <div className="flex justify-between">
-                              <span className="text-sm text-gray-600">Approved:</span>
+                              <span className="text-sm text-gray-600">
+                                Approved:
+                              </span>
                               <span className="text-sm font-medium text-gray-900">
-                                {new Date(impact.finalApprovalDate).toLocaleDateString()}
+                                {new Date(
+                                  impact.finalApprovalDate,
+                                ).toLocaleDateString()}
                               </span>
                             </div>
                           )}
                         </div>
                       </div>
-                      
+
                       <div className="space-y-3">
-                        <h6 className="font-medium text-gray-900">Financial Impact</h6>
+                        <h6 className="font-medium text-gray-900">
+                          Financial Impact
+                        </h6>
                         <div className="space-y-2">
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Investment:</span>
+                            <span className="text-sm text-gray-600">
+                              Investment:
+                            </span>
                             <span className="text-sm font-medium text-gray-900">
-                              {ROIImpactCalculator.formatCurrency(impact.investmentAmount)}
+                              {ROIImpactCalculator.formatCurrency(
+                                impact.investmentAmount,
+                              )}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Projected Value:</span>
+                            <span className="text-sm text-gray-600">
+                              Projected Value:
+                            </span>
                             <span className="text-sm font-medium text-gray-900">
-                              {ROIImpactCalculator.formatCurrency(impact.projectedValue)}
+                              {ROIImpactCalculator.formatCurrency(
+                                impact.projectedValue,
+                              )}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Value Lost:</span>
+                            <span className="text-sm text-gray-600">
+                              Value Lost:
+                            </span>
                             <span className="text-sm font-medium text-red-600">
-                              -{ROIImpactCalculator.formatCurrency(impact.lostValue)}
+                              -
+                              {ROIImpactCalculator.formatCurrency(
+                                impact.lostValue,
+                              )}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Impact:</span>
-                            <span className={`text-sm font-medium ${severity.color.split(' ')[0]}`}>
+                            <span className="text-sm text-gray-600">
+                              Impact:
+                            </span>
+                            <span
+                              className={`text-sm font-medium ${
+                                severity.color.split(' ')[0]
+                              }`}
+                            >
                               {severity.description}
                             </span>
                           </div>
                         </div>
                       </div>
                     </div>
-                    
+
                     {impact.businessCaseTypes.length > 0 && (
                       <div className="mt-4 pt-4 border-t border-gray-200">
-                        <h6 className="font-medium text-gray-900 mb-2">Business Case Types</h6>
+                        <h6 className="font-medium text-gray-900 mb-2">
+                          Business Case Types
+                        </h6>
                         <div className="flex flex-wrap gap-2">
                           {impact.businessCaseTypes.map((type) => (
-                            <span key={type} className="inline-flex px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+                            <span
+                              key={type}
+                              className="inline-flex px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full"
+                            >
                               {type}
                             </span>
                           ))}
@@ -561,12 +886,16 @@ const ROIImpactTracker: React.FC<ROIImpactTrackerProps> = ({
               </div>
             );
           })}
-          
+
           {roiImpactData.length === 0 && (
             <div className="text-center py-8 text-gray-500">
               <Target className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p className="text-lg font-medium text-gray-900 mb-2">No ROI Impact Data</p>
-              <p>No requests found with sufficient data for ROI impact analysis.</p>
+              <p className="text-lg font-medium text-gray-900 mb-2">
+                No ROI Impact Data
+              </p>
+              <p>
+                No requests found with sufficient data for ROI impact analysis.
+              </p>
             </div>
           )}
         </div>

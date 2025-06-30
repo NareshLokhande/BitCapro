@@ -63,7 +63,7 @@ export class NotificationService {
       slackWebhookUrl: import.meta.env.VITE_SLACK_WEBHOOK_URL,
       emailService: 'sendgrid',
       emailApiKey: import.meta.env.VITE_SENDGRID_API_KEY,
-      emailFrom: import.meta.env.VITE_EMAIL_FROM || 'noreply@approvia.com',
+      emailFrom: import.meta.env.VITE_EMAIL_FROM || 'noreply@Approvia.com',
       emailDomain: import.meta.env.VITE_EMAIL_DOMAIN,
     };
   }
@@ -805,7 +805,7 @@ export class NotificationService {
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email: message.to }] }],
-        from: { email: this.config.emailFrom || 'noreply@approvia.com' },
+        from: { email: this.config.emailFrom || 'noreply@Approvia.com' },
         subject: message.subject,
         content: [
           { type: 'text/html', value: message.html },
@@ -823,7 +823,7 @@ export class NotificationService {
   // Send via Mailgun
   private static async sendViaMailgun(message: EmailMessage): Promise<boolean> {
     const formData = new FormData();
-    formData.append('from', this.config.emailFrom || 'noreply@approvia.com');
+    formData.append('from', this.config.emailFrom || 'noreply@Approvia.com');
     formData.append('to', message.to);
     formData.append('subject', message.subject);
     formData.append('html', message.html);

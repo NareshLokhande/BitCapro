@@ -1,5 +1,11 @@
+import {
+  AlertCircle,
+  CheckCircle2,
+  Home,
+  LogIn,
+  RefreshCw,
+} from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, AlertCircle, RefreshCw, Home, LogIn } from 'lucide-react';
 
 interface LoadingSpinnerProps {
   timeout?: number;
@@ -7,10 +13,10 @@ interface LoadingSpinnerProps {
   showTimeoutImmediately?: boolean;
 }
 
-const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
-  timeout = 8000, 
+const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
+  timeout = 8000,
   onTimeout,
-  showTimeoutImmediately = false
+  showTimeoutImmediately = false,
 }) => {
   const [showTimeout, setShowTimeout] = useState(showTimeoutImmediately);
   const [countdown, setCountdown] = useState(Math.floor(timeout / 1000));
@@ -29,7 +35,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
     // Countdown timer
     const countdownInterval = setInterval(() => {
-      setCountdown(prev => {
+      setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(countdownInterval);
           return 0;
@@ -71,13 +77,16 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
               <p className="text-sm text-gray-500">Investment Management</p>
             </div>
           </div>
-          
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Loading Issue</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+              Loading Issue
+            </h2>
             <p className="text-gray-600 mb-6">
-              The application is taking longer than expected to load. This might be due to authentication issues or a slow connection.
+              The application is taking longer than expected to load. This might
+              be due to authentication issues or a slow connection.
             </p>
-            
+
             <div className="space-y-3">
               <button
                 onClick={handleGoLogin}
@@ -86,7 +95,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
                 <LogIn className="w-5 h-5 mr-2" />
                 Go to Login
               </button>
-              
+
               <button
                 onClick={handleRetry}
                 className="w-full flex items-center justify-center px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-all duration-200"
@@ -94,7 +103,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
                 <RefreshCw className="w-5 h-5 mr-2" />
                 Retry Loading
               </button>
-              
+
               <button
                 onClick={handleGoHome}
                 className="w-full flex items-center justify-center px-4 py-3 bg-gray-50 text-gray-600 font-semibold rounded-xl hover:bg-gray-100 transition-all duration-200"
@@ -125,7 +134,9 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         </div>
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
         <p className="text-gray-600 mt-4">Loading...</p>
-        <p className="text-gray-400 text-sm mt-2">Please wait while we initialize your session</p>
+        <p className="text-gray-400 text-sm mt-2">
+          Please wait while we initialize your session
+        </p>
         {countdown > 0 && (
           <p className="text-gray-400 text-xs mt-2">Timeout in {countdown}s</p>
         )}

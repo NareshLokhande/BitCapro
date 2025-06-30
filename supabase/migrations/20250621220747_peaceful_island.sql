@@ -22,7 +22,7 @@ BEGIN
   DELETE FROM user_profiles WHERE user_id IS NULL OR email IS NULL;
   
   -- Now we can safely remove test auth users
-  DELETE FROM auth.users WHERE email LIKE '%@approvia.com' AND id::text LIKE '00000000-%';
+  DELETE FROM auth.users WHERE email LIKE '%@Approvia.com' AND id::text LIKE '00000000-%';
   
   -- Clean up any remaining orphaned data
   DELETE FROM investment_requests WHERE user_id IS NOT NULL AND user_id NOT IN (SELECT id FROM auth.users);
@@ -164,12 +164,12 @@ GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 -- Insert demo user profiles (without trying to create auth users)
 -- These will be linked when users actually sign up
 INSERT INTO user_profiles (email, name, role, department, active) VALUES
-  ('admin@approvia.com', 'System Administrator', 'Admin', 'IT', true),
-  ('ceo@approvia.com', 'Emily Davis', 'Approver_L4', 'Executive', true),
-  ('cfo@approvia.com', 'Robert Chen', 'Approver_L3', 'Finance', true),
-  ('director1@approvia.com', 'Sarah Wilson', 'Approver_L2', 'Operations', true),
-  ('manager1@approvia.com', 'Mike Johnson', 'Approver_L1', 'Operations', true),
-  ('john.doe@approvia.com', 'John Doe', 'Submitter', 'Engineering', true)
+  ('admin@Approvia.com', 'System Administrator', 'Admin', 'IT', true),
+  ('ceo@Approvia.com', 'Emily Davis', 'Approver_L4', 'Executive', true),
+  ('cfo@Approvia.com', 'Robert Chen', 'Approver_L3', 'Finance', true),
+  ('director1@Approvia.com', 'Sarah Wilson', 'Approver_L2', 'Operations', true),
+  ('manager1@Approvia.com', 'Mike Johnson', 'Approver_L1', 'Operations', true),
+  ('john.doe@Approvia.com', 'John Doe', 'Submitter', 'Engineering', true)
 ON CONFLICT (email) DO UPDATE SET
   name = EXCLUDED.name,
   role = EXCLUDED.role,

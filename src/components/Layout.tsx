@@ -29,12 +29,12 @@ interface NavigationItem {
 // Constants
 const SIDEBAR_WIDTHS = {
   expanded: 'w-72',
-  collapsed: 'w-20',
+  collapsed: 'w-24',
 } as const;
 
 const CONTENT_MARGINS = {
   expanded: 'lg:pl-72',
-  collapsed: 'lg:pl-20',
+  collapsed: 'lg:pl-24',
 } as const;
 
 const Layout: React.FC = () => {
@@ -180,7 +180,7 @@ const Layout: React.FC = () => {
     ? CONTENT_MARGINS.collapsed
     : CONTENT_MARGINS.expanded;
   const collapseButtonTransform = sidebarCollapsed
-    ? 'translate-x-12'
+    ? 'translate-x-16'
     : 'translate-x-64';
 
   // Component renderers
@@ -260,14 +260,12 @@ const Layout: React.FC = () => {
   };
 
   const renderNavigation = () => (
-    <nav
-      className={`flex-1 py-8 space-y-2 ${sidebarCollapsed ? 'px-4' : 'px-6'}`}
-    >
+    <nav className={`py-8 space-y-2 ${sidebarCollapsed ? 'px-2' : 'px-6'}`}>
       <Link
         to="/"
         onClick={handleNavigationClick}
         className={`group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-gray-200 mb-4 ${
-          sidebarCollapsed ? 'justify-center px-2' : ''
+          sidebarCollapsed ? 'justify-center px-3' : ''
         }`}
         title={sidebarCollapsed ? 'Back to Home' : ''}
       >
@@ -291,7 +289,7 @@ const Layout: React.FC = () => {
               active
                 ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-sm border border-blue-100'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            } ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+            } ${sidebarCollapsed ? 'justify-center px-3' : ''}`}
             title={sidebarCollapsed ? item.name : ''}
           >
             <Icon
@@ -299,7 +297,7 @@ const Layout: React.FC = () => {
                 active
                   ? 'text-blue-600'
                   : 'text-gray-500 group-hover:text-gray-700'
-              }`}
+              } ${sidebarCollapsed ? 'text-gray-600' : ''}`}
             />
             {!sidebarCollapsed && (
               <>
@@ -318,18 +316,20 @@ const Layout: React.FC = () => {
   const renderSignOut = () => (
     <div
       className={`py-6 border-t border-gray-100 ${
-        sidebarCollapsed ? 'px-4' : 'px-6'
+        sidebarCollapsed ? 'px-2' : 'px-6'
       }`}
     >
       <button
         onClick={handleSignOut}
         className={`w-full flex items-center px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 ${
-          sidebarCollapsed ? 'justify-center px-2' : ''
+          sidebarCollapsed ? 'justify-center px-3' : ''
         }`}
         title={sidebarCollapsed ? 'Sign Out' : ''}
       >
         <LogOut
-          className={`${sidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'} text-red-500`}
+          className={`${
+            sidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'
+          } text-red-500 ${sidebarCollapsed ? 'text-red-600' : ''}`}
         />
         {!sidebarCollapsed && <span className="ml-3">Sign Out</span>}
       </button>
@@ -383,7 +383,9 @@ const Layout: React.FC = () => {
         <div className="flex flex-col h-full">
           {renderLogo()}
           {renderUserInfo()}
-          {renderNavigation()}
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400">
+            <div className="pb-4">{renderNavigation()}</div>
+          </div>
           {renderSignOut()}
         </div>
       </div>

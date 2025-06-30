@@ -21,20 +21,24 @@ import {
 import { useApprovalLogs, useInvestmentRequests } from '../hooks/useSupabase';
 import StyledDropdown from './StyledDropdown';
 
+interface ApprovalMetric {
+  requestId: string;
+  projectTitle: string;
+  department: string;
+  submittedDate: Date;
+  approvalDate: Date;
+  approvalTimeDays: number;
+  status: string;
+  totalAmount: number;
+  level: number;
+}
+
 const ApprovalTimesAnalytics: React.FC = () => {
   const { requests, loading: requestsLoading } = useInvestmentRequests();
   const { logs, loading: logsLoading } = useApprovalLogs();
 
   const [departmentFilter, setDepartmentFilter] = useState('All');
   const [timeRangeFilter, setTimeRangeFilter] = useState('Last 12 Months');
-
-  if (requestsLoading || logsLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
 
   // Calculate approval times and metrics
   const approvalMetrics = useMemo(() => {
@@ -68,9 +72,9 @@ const ApprovalTimesAnalytics: React.FC = () => {
           status: approvalLog.status,
           totalAmount: request.base_currency_capex + request.base_currency_opex,
           level: approvalLog.level,
-        };
+        } as ApprovalMetric;
       })
-      .filter(Boolean);
+      .filter((metric): metric is ApprovalMetric => metric !== null);
 
     // Filter by department
     const filteredMetrics =
@@ -233,7 +237,13 @@ const ApprovalTimesAnalytics: React.FC = () => {
     ];
   };
 
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+  if (requestsLoading || logsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -394,7 +404,7 @@ const ApprovalTimesAnalytics: React.FC = () => {
               <XAxis dataKey="range" />
               <YAxis />
               <Tooltip
-                formatter={(value: any, name: any) => [
+                formatter={(value: number) => [
                   `${value} requests (${(
                     (value / summaryMetrics.totalRequests) *
                     100
@@ -418,7 +428,7 @@ const ApprovalTimesAnalytics: React.FC = () => {
               <XAxis dataKey="department" />
               <YAxis />
               <Tooltip
-                formatter={(value: any, name: any) => [
+                formatter={(value: number, name: string) => [
                   name === 'averageDays'
                     ? `${value} days`
                     : `${value.toFixed(1)}%`,
@@ -443,7 +453,7 @@ const ApprovalTimesAnalytics: React.FC = () => {
             <YAxis yAxisId="left" />
             <YAxis yAxisId="right" orientation="right" />
             <Tooltip
-              formatter={(value: any, name: any) => [
+              formatter={(value: number, name: string) => [
                 name === 'averageDays'
                   ? `${value} days`
                   : `${value.toFixed(1)}%`,

@@ -340,11 +340,11 @@ CREATE INDEX IF NOT EXISTS idx_business_case_routing_role ON business_case_routi
 
 -- Add some sample users with new roles for testing
 INSERT INTO user_profiles (email, name, role, department, active) VALUES
-  ('sustainability@approvia.com', 'Green Smith', 'Sustainability_Officer', 'ESG', true),
-  ('legal@approvia.com', 'Legal Eagle', 'Legal_Officer', 'Legal', true),
-  ('compliance@approvia.com', 'Compliance Jones', 'Compliance_Officer', 'Compliance', true),
-  ('bizdev@approvia.com', 'Business Developer', 'Business_Development', 'Strategy', true),
-  ('assets@approvia.com', 'Asset Manager', 'Asset_Manager', 'Operations', true)
+  ('sustainability@Approvia.com', 'Green Smith', 'Sustainability_Officer', 'ESG', true),
+  ('legal@Approvia.com', 'Legal Eagle', 'Legal_Officer', 'Legal', true),
+  ('compliance@Approvia.com', 'Compliance Jones', 'Compliance_Officer', 'Compliance', true),
+  ('bizdev@Approvia.com', 'Business Developer', 'Business_Development', 'Strategy', true),
+  ('assets@Approvia.com', 'Asset Manager', 'Asset_Manager', 'Operations', true)
 ON CONFLICT (email) DO UPDATE SET
   name = EXCLUDED.name,
   role = EXCLUDED.role,

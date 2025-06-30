@@ -1,12 +1,18 @@
 import {
   Activity,
   AlertCircle,
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight,
+  Award,
   BarChart3,
   Building,
   Building2,
+  Calendar,
   CheckCircle,
   Clock,
   DollarSign,
+  Eye,
   Filter,
   Globe,
   Leaf,
@@ -14,9 +20,11 @@ import {
   Package,
   PieChart,
   Scale,
+  Target,
   Timer,
   TrendingDown,
   TrendingUp,
+  Zap,
 } from 'lucide-react';
 import React, { useState } from 'react';
 import {
@@ -40,8 +48,13 @@ import {
   ESGCalculator,
   formatEmissions,
 } from '../lib/esgCalculator';
-import { formatCurrency, getCurrencySymbol } from '../lib/supabase';
-import ApprovalTimeTracker from './ApprovalTimeTracker';
+import {
+  formatCurrencyAmount,
+  formatNumber,
+  getCurrencySymbol,
+} from '../lib/supabase';
+import ApprovalTimesAnalytics from './ApprovalTimesAnalytics';
+import ROIImpactTracker from './ROIImpactTracker';
 import StyledDropdown from './StyledDropdown';
 
 const Dashboard: React.FC = () => {
@@ -53,7 +66,7 @@ const Dashboard: React.FC = () => {
   const [yearFilter, setYearFilter] = useState('All');
   const [departmentFilter, setDepartmentFilter] = useState('All');
   const [activeWidget, setActiveWidget] = useState<
-    'overview' | 'approval-times'
+    'overview' | 'approval-times' | 'roi-impact'
   >('overview');
 
   if (requestsLoading || kpisLoading) {
@@ -92,7 +105,6 @@ const Dashboard: React.FC = () => {
   const pendingRequests = filteredRequests.filter((req) =>
     ['Under Review', 'Submitted'].includes(req.status),
   );
-  const inBudgetRequests = filteredRequests.filter((req) => req.is_in_budget);
   const approvalRate =
     filteredRequests.length > 0
       ? (approvedRequests.length / filteredRequests.length) * 100
@@ -101,6 +113,37 @@ const Dashboard: React.FC = () => {
     kpis.length > 0
       ? kpis.reduce((sum, kpi) => sum + kpi.irr, 0) / kpis.length
       : 0;
+
+  // Enhanced decision-making metrics
+  const highPriorityRequests = filteredRequests.filter((req) =>
+    ['High', 'Critical'].includes(req.priority),
+  );
+  const outOfBudgetRequests = filteredRequests.filter(
+    (req) => !req.is_in_budget,
+  );
+  const avgProcessingTime = 15; // Days - would come from actual data
+  const budgetUtilization =
+    (filteredRequests.filter((req) => req.is_in_budget).length /
+      filteredRequests.length) *
+    100;
+
+  // Risk metrics
+  const highRiskRequests = filteredRequests.filter(
+    (req) =>
+      req.business_case_type?.includes('Compliance') ||
+      req.business_case_type?.includes('ESG') ||
+      req.priority === 'Critical',
+  );
+  const riskScore = (highRiskRequests.length / filteredRequests.length) * 100;
+
+  // Performance trends (simulated data for now)
+  const previousQuarterInvestment = totalInvestment * 0.85; // 15% growth
+  const investmentGrowth =
+    ((totalInvestment - previousQuarterInvestment) /
+      previousQuarterInvestment) *
+    100;
+  const previousQuarterApprovalRate = approvalRate - 2.5; // 2.5% improvement
+  const approvalRateImprovement = approvalRate - previousQuarterApprovalRate;
 
   // ESG specific calculations
   const esgRequests = filteredRequests.filter((req) =>
@@ -282,56 +325,49 @@ const Dashboard: React.FC = () => {
   };
 
   // Custom label function for pie chart that handles responsive display
-  const renderCustomizedLabel = (entry: any, index: number) => {
+  const renderCustomizedLabel = (props: {
+    cx: number;
+    cy: number;
+    midAngle: number;
+    innerRadius: number;
+    outerRadius: number;
+    percent: number;
+  }) => {
+    const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props;
     const RADIAN = Math.PI / 180;
-    const radius =
-      entry.innerRadius + (entry.outerRadius - entry.innerRadius) * 0.5;
-    const x = entry.cx + radius * Math.cos(-entry.midAngle * RADIAN);
-    const y = entry.cy + radius * Math.sin(-entry.midAngle * RADIAN);
-    const percent = (
-      (entry.value / pieData.reduce((sum, item) => sum + item.value, 0)) *
-      100
-    ).toFixed(0);
-
-    // Only show label if percentage is significant enough (>5%) to avoid clutter
-    if (parseFloat(percent) < 5) {
-      return null;
-    }
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
     return (
       <text
         x={x}
         y={y}
         fill="white"
-        textAnchor={x > entry.cx ? 'start' : 'end'}
+        textAnchor={x > cx ? 'start' : 'end'}
         dominantBaseline="central"
-        fontSize="12"
-        fontWeight="600"
-        className="drop-shadow-sm"
+        fontSize={12}
+        fontWeight="bold"
       >
-        {`${percent}%`}
+        {`${(percent * 100).toFixed(0)}%`}
       </text>
     );
   };
 
   // Custom legend component for better mobile display
-  const CustomLegend = ({ payload }: any) => (
+  const CustomLegend = ({
+    payload,
+  }: {
+    payload: Array<{ value: string; color: string }>;
+  }) => (
     <div className="flex flex-wrap justify-center gap-2 mt-4">
-      {payload.map((entry: any, index: number) => (
-        <div
-          key={index}
-          className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-lg"
-        >
+      {payload.map((entry, index) => (
+        <div key={index} className="flex items-center">
           <div
-            className="w-3 h-3 rounded-full"
+            className="w-3 h-3 rounded-full mr-2"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-xs font-medium text-gray-700 truncate max-w-20">
-            {entry.value}
-          </span>
-          <span className="text-xs text-gray-500">
-            ({pieData.find((item) => item.name === entry.value)?.value || 0})
-          </span>
+          <span className="text-sm text-gray-600">{entry.value}</span>
         </div>
       ))}
     </div>
@@ -376,7 +412,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">
-                ${(totalInvestment / 1000000).toFixed(1)}M
+                ${formatNumber(totalInvestment)}
               </div>
               <div className="text-sm text-blue-100">
                 Total Investment (USD)
@@ -416,12 +452,25 @@ const Dashboard: React.FC = () => {
             <Timer className="w-4 h-4 mr-2" />
             Approval Times
           </button>
+          <button
+            onClick={() => setActiveWidget('roi-impact')}
+            className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeWidget === 'roi-impact'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <TrendingDown className="w-4 h-4 mr-2" />
+            ROI Impact
+          </button>
         </div>
       </div>
 
       {/* Conditional Widget Rendering */}
       {activeWidget === 'approval-times' ? (
-        <ApprovalTimeTracker />
+        <ApprovalTimesAnalytics />
+      ) : activeWidget === 'roi-impact' ? (
+        <ROIImpactTracker />
       ) : (
         <>
           {/* Filters */}
@@ -509,7 +558,7 @@ const Dashboard: React.FC = () => {
                     Total Investment
                   </p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">
-                    ${(totalInvestment / 1000000).toFixed(1)}M
+                    ${formatNumber(totalInvestment)}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">USD Equivalent</p>
                 </div>
@@ -518,9 +567,18 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
               <div className="mt-4 flex items-center">
-                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600 font-medium">
-                  +12.5%
+                {investmentGrowth >= 0 ? (
+                  <ArrowUpRight className="w-4 h-4 text-green-500 mr-1" />
+                ) : (
+                  <ArrowDownRight className="w-4 h-4 text-red-500 mr-1" />
+                )}
+                <span
+                  className={`text-sm font-medium ${
+                    investmentGrowth >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}
+                >
+                  {investmentGrowth >= 0 ? '+' : ''}
+                  {investmentGrowth.toFixed(1)}%
                 </span>
                 <span className="text-sm text-gray-500 ml-1">
                   vs last quarter
@@ -544,9 +602,20 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
               <div className="mt-4 flex items-center">
-                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600 font-medium">
-                  +5.2%
+                {approvalRateImprovement >= 0 ? (
+                  <ArrowUpRight className="w-4 h-4 text-green-500 mr-1" />
+                ) : (
+                  <ArrowDownRight className="w-4 h-4 text-red-500 mr-1" />
+                )}
+                <span
+                  className={`text-sm font-medium ${
+                    approvalRateImprovement >= 0
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                  }`}
+                >
+                  {approvalRateImprovement >= 0 ? '+' : ''}
+                  {approvalRateImprovement.toFixed(1)}%
                 </span>
                 <span className="text-sm text-gray-500 ml-1">
                   vs last quarter
@@ -572,11 +641,11 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
               <div className="mt-4 flex items-center">
-                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600 font-medium">
-                  +2.1%
+                <Target className="w-4 h-4 text-blue-500 mr-1" />
+                <span className="text-sm text-blue-600 font-medium">
+                  Target: 12.0%
                 </span>
-                <span className="text-sm text-gray-500 ml-1">vs target</span>
+                <span className="text-sm text-gray-500 ml-1">vs benchmark</span>
               </div>
             </div>
 
@@ -596,13 +665,109 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
               <div className="mt-4 flex items-center">
-                <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
-                <span className="text-sm text-red-600 font-medium">
-                  -3 days
+                <Timer className="w-4 h-4 text-orange-500 mr-1" />
+                <span className="text-sm text-orange-600 font-medium">
+                  {avgProcessingTime} days
                 </span>
                 <span className="text-sm text-gray-500 ml-1">
                   avg processing
                 </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Decision-Making Insights Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="bg-gradient-to-br from-red-50 to-pink-50 rounded-xl p-6 border border-red-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-red-900">
+                  Risk Analysis
+                </h3>
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-red-700">Risk Score</span>
+                  <span className="text-lg font-bold text-red-900">
+                    {riskScore.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-red-700">
+                    High Risk Projects
+                  </span>
+                  <span className="text-lg font-bold text-red-900">
+                    {highRiskRequests.length}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-red-700">Out of Budget</span>
+                  <span className="text-lg font-bold text-red-900">
+                    {outOfBudgetRequests.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-blue-900">
+                  Performance Metrics
+                </h3>
+                <Award className="w-6 h-6 text-blue-600" />
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-blue-700">
+                    Budget Utilization
+                  </span>
+                  <span className="text-lg font-bold text-blue-900">
+                    {budgetUtilization.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-blue-700">High Priority</span>
+                  <span className="text-lg font-bold text-blue-900">
+                    {highPriorityRequests.length}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-blue-700">Processing Time</span>
+                  <span className="text-lg font-bold text-blue-900">
+                    {avgProcessingTime} days
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-green-900">
+                  ESG Impact
+                </h3>
+                <Leaf className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-green-700">ESG Projects</span>
+                  <span className="text-lg font-bold text-green-900">
+                    {esgRequests.length}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-green-700">
+                    Carbon Reduction
+                  </span>
+                  <span className="text-lg font-bold text-green-900">
+                    {formatEmissions(totalCarbonReduction)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-green-700">Avg ESG Score</span>
+                  <span className="text-lg font-bold text-green-900">
+                    {avgESGScore.toFixed(0)}/100
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -644,6 +809,211 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Actionable Insights & Recommendations */}
+          <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6 border border-purple-200">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-purple-900 flex items-center">
+                <Zap className="w-6 h-6 mr-3" />
+                Actionable Insights & Recommendations
+              </h3>
+              <Eye className="w-5 h-5 text-purple-600" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Priority Actions */}
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-100">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <AlertTriangle className="w-5 h-5 text-orange-500 mr-2" />
+                  Priority Actions Required
+                </h4>
+                <div className="space-y-4">
+                  {pendingRequests.length > 5 && (
+                    <div className="flex items-start p-3 bg-orange-50 rounded-lg border border-orange-200">
+                      <div className="flex-shrink-0 w-2 h-2 bg-orange-500 rounded-full mt-2 mr-3"></div>
+                      <div>
+                        <p className="text-sm font-medium text-orange-900">
+                          High Pending Requests
+                        </p>
+                        <p className="text-xs text-orange-700 mt-1">
+                          {pendingRequests.length} requests awaiting review.
+                          Consider expediting high-priority items.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {outOfBudgetRequests.length > 0 && (
+                    <div className="flex items-start p-3 bg-red-50 rounded-lg border border-red-200">
+                      <div className="flex-shrink-0 w-2 h-2 bg-red-500 rounded-full mt-2 mr-3"></div>
+                      <div>
+                        <p className="text-sm font-medium text-red-900">
+                          Budget Overruns Detected
+                        </p>
+                        <p className="text-xs text-red-700 mt-1">
+                          {outOfBudgetRequests.length} projects exceed budget.
+                          Review and adjust allocations.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {riskScore > 30 && (
+                    <div className="flex items-start p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <div className="flex-shrink-0 w-2 h-2 bg-yellow-500 rounded-full mt-2 mr-3"></div>
+                      <div>
+                        <p className="text-sm font-medium text-yellow-900">
+                          Elevated Risk Level
+                        </p>
+                        <p className="text-xs text-yellow-700 mt-1">
+                          Risk score of {riskScore.toFixed(1)}% requires
+                          additional oversight and monitoring.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {avgROI < 10 && (
+                    <div className="flex items-start p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3"></div>
+                      <div>
+                        <p className="text-sm font-medium text-blue-900">
+                          Below Target ROI
+                        </p>
+                        <p className="text-xs text-blue-700 mt-1">
+                          Average IRR of {avgROI.toFixed(1)}% is below 12%
+                          target. Review project selection criteria.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Performance Insights */}
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-100">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <TrendingUp className="w-5 h-5 text-green-500 mr-2" />
+                  Performance Insights
+                </h4>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div>
+                      <p className="text-sm font-medium text-green-900">
+                        Investment Growth
+                      </p>
+                      <p className="text-xs text-green-700">
+                        Quarter over quarter
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p
+                        className={`text-lg font-bold ${
+                          investmentGrowth >= 0
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                        }`}
+                      >
+                        {investmentGrowth >= 0 ? '+' : ''}
+                        {investmentGrowth.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-green-700">
+                        {investmentGrowth >= 0 ? 'Positive' : 'Declining'} trend
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">
+                        Approval Efficiency
+                      </p>
+                      <p className="text-xs text-blue-700">Rate improvement</p>
+                    </div>
+                    <div className="text-right">
+                      <p
+                        className={`text-lg font-bold ${
+                          approvalRateImprovement >= 0
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                        }`}
+                      >
+                        {approvalRateImprovement >= 0 ? '+' : ''}
+                        {approvalRateImprovement.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-blue-700">
+                        {approvalRateImprovement >= 0
+                          ? 'Improving'
+                          : 'Declining'}{' '}
+                        performance
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-200">
+                    <div>
+                      <p className="text-sm font-medium text-purple-900">
+                        Budget Utilization
+                      </p>
+                      <p className="text-xs text-purple-700">
+                        Efficiency metric
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p
+                        className={`text-lg font-bold ${
+                          budgetUtilization >= 80
+                            ? 'text-green-600'
+                            : budgetUtilization >= 60
+                            ? 'text-yellow-600'
+                            : 'text-red-600'
+                        }`}
+                      >
+                        {budgetUtilization.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-purple-700">
+                        {budgetUtilization >= 80
+                          ? 'Excellent'
+                          : budgetUtilization >= 60
+                          ? 'Good'
+                          : 'Needs attention'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200">
+                    <div>
+                      <p className="text-sm font-medium text-orange-900">
+                        Processing Speed
+                      </p>
+                      <p className="text-xs text-orange-700">Average days</p>
+                    </div>
+                    <div className="text-right">
+                      <p
+                        className={`text-lg font-bold ${
+                          avgProcessingTime <= 10
+                            ? 'text-green-600'
+                            : avgProcessingTime <= 20
+                            ? 'text-yellow-600'
+                            : 'text-red-600'
+                        }`}
+                      >
+                        {avgProcessingTime} days
+                      </p>
+                      <p className="text-xs text-orange-700">
+                        {avgProcessingTime <= 10
+                          ? 'Fast'
+                          : avgProcessingTime <= 20
+                          ? 'Moderate'
+                          : 'Slow'}{' '}
+                        processing
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Charts Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -726,6 +1096,168 @@ const Dashboard: React.FC = () => {
                   color: COLORS[index % COLORS.length],
                 }))}
               />
+            </div>
+          </div>
+
+          {/* Trend Analysis & Forecasting */}
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-200">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-indigo-900 flex items-center">
+                <TrendingUp className="w-6 h-6 mr-3" />
+                Trend Analysis & Forecasting
+              </h3>
+              <Calendar className="w-5 h-5 text-indigo-600" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Investment Trends */}
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-indigo-100">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <DollarSign className="w-5 h-5 text-green-500 mr-2" />
+                  Investment Trends
+                </h4>
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-gray-900 mb-2">
+                      ${formatNumber(totalInvestment)}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Total Investment
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-700">Growth Rate</span>
+                    <span
+                      className={`text-lg font-bold ${
+                        investmentGrowth >= 0
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                      }`}
+                    >
+                      {investmentGrowth >= 0 ? '+' : ''}
+                      {investmentGrowth.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-700">Projected Q4</span>
+                    <span className="text-lg font-bold text-blue-600">
+                      ${formatNumber(totalInvestment * 1.15)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Approval Trends */}
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-indigo-100">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <CheckCircle className="w-5 h-5 text-blue-500 mr-2" />
+                  Approval Trends
+                </h4>
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-gray-900 mb-2">
+                      {approvalRate.toFixed(1)}%
+                    </div>
+                    <div className="text-sm text-gray-600">Current Rate</div>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-700">Improvement</span>
+                    <span
+                      className={`text-lg font-bold ${
+                        approvalRateImprovement >= 0
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                      }`}
+                    >
+                      {approvalRateImprovement >= 0 ? '+' : ''}
+                      {approvalRateImprovement.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-700">Target Rate</span>
+                    <span className="text-lg font-bold text-purple-600">
+                      85%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Risk & Performance */}
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-indigo-100">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <AlertTriangle className="w-5 h-5 text-orange-500 mr-2" />
+                  Risk & Performance
+                </h4>
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-gray-900 mb-2">
+                      {riskScore.toFixed(1)}%
+                    </div>
+                    <div className="text-sm text-gray-600">Risk Score</div>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-700">Avg ROI</span>
+                    <span
+                      className={`text-lg font-bold ${
+                        avgROI >= 12 ? 'text-green-600' : 'text-orange-600'
+                      }`}
+                    >
+                      {avgROI.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-700">Processing</span>
+                    <span
+                      className={`text-lg font-bold ${
+                        avgProcessingTime <= 15
+                          ? 'text-green-600'
+                          : 'text-orange-600'
+                      }`}
+                    >
+                      {avgProcessingTime} days
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Forecast Chart */}
+            <div className="mt-6 bg-white rounded-xl p-6 shadow-sm border border-indigo-100">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                6-Month Forecast
+              </h4>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip
+                      formatter={(value: number) => [
+                        `$${value}K USD`,
+                        'Investment',
+                      ]}
+                      labelStyle={{ color: '#374151' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="investment"
+                      stackId="1"
+                      stroke="#3B82F6"
+                      fill="#3B82F6"
+                      fillOpacity={0.1}
+                      name="Investment ($K USD)"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="approved"
+                      stroke="#10B981"
+                      strokeWidth={3}
+                      name="Approved Requests"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
 
@@ -990,7 +1522,7 @@ const Dashboard: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {formatCurrency(
+                          {formatCurrencyAmount(
                             request.capex + request.opex,
                             request.currency,
                           )}

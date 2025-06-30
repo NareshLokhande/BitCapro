@@ -66,12 +66,48 @@ const LoginPage: React.FC = () => {
   };
 
   const demoCredentials = [
-    { email: 'admin@approvia.com', password: 'password123', role: 'Admin', name: 'System Administrator', department: 'IT' },
-    { email: 'ceo@approvia.com', password: 'password123', role: 'Approver_L4', name: 'Emily Davis', department: 'Executive' },
-    { email: 'cfo@approvia.com', password: 'password123', role: 'Approver_L3', name: 'Robert Chen', department: 'Finance' },
-    { email: 'director1@approvia.com', password: 'password123', role: 'Approver_L2', name: 'Sarah Wilson', department: 'Operations' },
-    { email: 'manager1@approvia.com', password: 'password123', role: 'Approver_L1', name: 'Mike Johnson', department: 'Engineering' },
-    { email: 'john.doe@approvia.com', password: 'password123', role: 'Submitter', name: 'John Doe', department: 'Engineering' },
+    {
+      email: 'admin@Approvia.com',
+      password: 'password123',
+      role: 'Admin',
+      name: 'System Administrator',
+      department: 'IT',
+    },
+    {
+      email: 'ceo@Approvia.com',
+      password: 'password123',
+      role: 'Approver_L4',
+      name: 'Emily Davis',
+      department: 'Executive',
+    },
+    {
+      email: 'cfo@Approvia.com',
+      password: 'password123',
+      role: 'Approver_L3',
+      name: 'Robert Chen',
+      department: 'Finance',
+    },
+    {
+      email: 'director1@Approvia.com',
+      password: 'password123',
+      role: 'Approver_L2',
+      name: 'Sarah Wilson',
+      department: 'Operations',
+    },
+    {
+      email: 'manager1@Approvia.com',
+      password: 'password123',
+      role: 'Approver_L1',
+      name: 'Mike Johnson',
+      department: 'Engineering',
+    },
+    {
+      email: 'john.doe@Approvia.com',
+      password: 'password123',
+      role: 'Submitter',
+      name: 'John Doe',
+      department: 'Engineering',
+    },
   ];
 
   const createDemoUsers = async () => {
@@ -131,13 +167,13 @@ const LoginPage: React.FC = () => {
       <div className="fixed top-4 right-4 z-50">
         <a
           href="https://bolt.new"
-          title="Built with Bolt"
+          title="Built on Bolt"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
         >
           <Zap className="w-4 h-4 mr-2" />
-          Built with Bolt
+          Built on Bolt
         </a>
       </div>
 

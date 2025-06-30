@@ -15,12 +15,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true
-  }
+    detectSessionInUrl: true,
+  },
 });
 
 // Test connection with better error handling
-supabase.from('investment_requests').select('count', { count: 'exact', head: true })
+supabase
+  .from('investment_requests')
+  .select('count', { count: 'exact', head: true })
   .then(({ count, error }) => {
     if (error) {
       console.error('Supabase connection test failed:', error);
@@ -34,12 +36,36 @@ supabase.from('investment_requests').select('count', { count: 'exact', head: tru
 
 // Business Case Types
 export const BUSINESS_CASE_TYPES = [
-  { value: 'Compliance', label: 'Compliance', description: 'Regulatory compliance and risk mitigation' },
-  { value: 'ESG', label: 'ESG (Environmental, Social, Governance)', description: 'Sustainability and ESG initiatives' },
-  { value: 'Cost Control', label: 'Cost Control', description: 'Cost reduction and efficiency improvements' },
-  { value: 'Expansion', label: 'Expansion', description: 'Business expansion and growth initiatives' },
-  { value: 'Asset Creation', label: 'Asset Creation', description: 'New asset development and creation' },
-  { value: 'IPO Prep', label: 'IPO Preparation', description: 'Initial Public Offering preparation activities' }
+  {
+    value: 'Compliance',
+    label: 'Compliance',
+    description: 'Regulatory compliance and risk mitigation',
+  },
+  {
+    value: 'ESG',
+    label: 'ESG (Environmental, Social, Governance)',
+    description: 'Sustainability and ESG initiatives',
+  },
+  {
+    value: 'Cost Control',
+    label: 'Cost Control',
+    description: 'Cost reduction and efficiency improvements',
+  },
+  {
+    value: 'Expansion',
+    label: 'Expansion',
+    description: 'Business expansion and growth initiatives',
+  },
+  {
+    value: 'Asset Creation',
+    label: 'Asset Creation',
+    description: 'New asset development and creation',
+  },
+  {
+    value: 'IPO Prep',
+    label: 'IPO Preparation',
+    description: 'Initial Public Offering preparation activities',
+  },
 ];
 
 // Stock Exchange options for IPO Prep
@@ -52,7 +78,7 @@ export const STOCK_EXCHANGES = [
   { value: 'EURONEXT', label: 'Euronext' },
   { value: 'TSX', label: 'Toronto Stock Exchange (TSX)' },
   { value: 'ASX', label: 'Australian Securities Exchange (ASX)' },
-  { value: 'OTHER', label: 'Other' }
+  { value: 'OTHER', label: 'Other' },
 ];
 
 // Currency utilities
@@ -86,124 +112,142 @@ export const SUPPORTED_CURRENCIES = [
   { code: 'THB', name: 'Thai Baht', symbol: '฿' },
   { code: 'MYR', name: 'Malaysian Ringgit', symbol: 'RM' },
   { code: 'IDR', name: 'Indonesian Rupiah', symbol: 'Rp' },
-  { code: 'PHP', name: 'Philippine Peso', symbol: '₱' }
+  { code: 'PHP', name: 'Philippine Peso', symbol: '₱' },
 ];
 
 export const getCurrencySymbol = (currencyCode: string): string => {
-  const currency = SUPPORTED_CURRENCIES.find(c => c.code === currencyCode);
+  const currency = SUPPORTED_CURRENCIES.find((c) => c.code === currencyCode);
   return currency?.symbol || currencyCode;
 };
 
-export const formatCurrency = (amount: number, currencyCode: string): string => {
+export const formatCurrency = (
+  amount: number,
+  currencyCode: string,
+): string => {
   const symbol = getCurrencySymbol(currencyCode);
   return `${symbol}${amount.toLocaleString()}`;
 };
 
 // Exchange rate cache
-let exchangeRateCache: { rates: Record<string, number>; timestamp: number } | null = null;
+let exchangeRateCache: {
+  rates: Record<string, number>;
+  timestamp: number;
+} | null = null;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Fallback rates in case API fails
 const FALLBACK_RATES: Record<string, number> = {
-  'USD': 1.0,
-  'EUR': 0.85,
-  'GBP': 0.73,
-  'JPY': 110.0,
-  'CAD': 1.25,
-  'AUD': 1.35,
-  'CHF': 0.92,
-  'CNY': 6.45,
-  'INR': 74.5,
-  'SGD': 1.35,
-  'HKD': 7.8,
-  'NOK': 8.5,
-  'SEK': 8.8,
-  'DKK': 6.3,
-  'PLN': 3.9,
-  'CZK': 21.5,
-  'HUF': 295.0,
-  'RON': 4.2,
-  'BGN': 1.66,
-  'HRK': 6.4,
-  'RUB': 73.0,
-  'TRY': 8.5,
-  'BRL': 5.2,
-  'MXN': 20.0,
-  'ZAR': 14.5,
-  'KRW': 1180.0,
-  'THB': 31.0,
-  'MYR': 4.1,
-  'IDR': 14250.0,
-  'PHP': 50.0
+  USD: 1.0,
+  EUR: 0.85,
+  GBP: 0.73,
+  JPY: 110.0,
+  CAD: 1.25,
+  AUD: 1.35,
+  CHF: 0.92,
+  CNY: 6.45,
+  INR: 74.5,
+  SGD: 1.35,
+  HKD: 7.8,
+  NOK: 8.5,
+  SEK: 8.8,
+  DKK: 6.3,
+  PLN: 3.9,
+  CZK: 21.5,
+  HUF: 295.0,
+  RON: 4.2,
+  BGN: 1.66,
+  HRK: 6.4,
+  RUB: 73.0,
+  TRY: 8.5,
+  BRL: 5.2,
+  MXN: 20.0,
+  ZAR: 14.5,
+  KRW: 1180.0,
+  THB: 31.0,
+  MYR: 4.1,
+  IDR: 14250.0,
+  PHP: 50.0,
 };
 
 // Fetch live exchange rates
-export const fetchLiveExchangeRates = async (): Promise<Record<string, number>> => {
+export const fetchLiveExchangeRates = async (): Promise<
+  Record<string, number>
+> => {
   try {
     // Check cache first
-    if (exchangeRateCache && (Date.now() - exchangeRateCache.timestamp) < CACHE_DURATION) {
+    if (
+      exchangeRateCache &&
+      Date.now() - exchangeRateCache.timestamp < CACHE_DURATION
+    ) {
       console.log('Using cached exchange rates');
       return exchangeRateCache.rates;
     }
 
     console.log('Fetching live exchange rates...');
-    
+
     // Call our Supabase edge function
-    const response = await fetch(`${supabaseUrl}/functions/v1/get-exchange-rates`, {
-      headers: {
-        'Authorization': `Bearer ${supabaseAnonKey}`,
-        'Content-Type': 'application/json',
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/get-exchange-rates`,
+      {
+        headers: {
+          Authorization: `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+        },
       },
-    });
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
-    
+
     if (data.success && data.rates) {
       // Update cache
       exchangeRateCache = {
         rates: data.rates,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
-      
+
       console.log('Live exchange rates fetched successfully:', data.source);
       return data.rates;
     } else {
-      throw new Error(data.error || 'Invalid response from exchange rate service');
+      throw new Error(
+        data.error || 'Invalid response from exchange rate service',
+      );
     }
-    
   } catch (error) {
     console.error('Error fetching live exchange rates:', error);
     console.log('Using fallback exchange rates');
-    
+
     // Update cache with fallback rates
     exchangeRateCache = {
       rates: FALLBACK_RATES,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
-    
+
     return FALLBACK_RATES;
   }
 };
 
 // Get exchange rate with live data
-export const getExchangeRate = async (fromCurrency: string, toCurrency: string = 'USD'): Promise<number> => {
+export const getExchangeRate = async (
+  fromCurrency: string,
+  toCurrency: string = 'USD',
+): Promise<number> => {
   if (fromCurrency === toCurrency) return 1.0;
-  
+
   try {
     const rates = await fetchLiveExchangeRates();
-    
+
     const fromRate = rates[fromCurrency] || FALLBACK_RATES[fromCurrency] || 1.0;
     const toRate = rates[toCurrency] || FALLBACK_RATES[toCurrency] || 1.0;
-    
+
     // Convert via USD: from -> USD -> to
     return toRate / fromRate;
   } catch (error) {
     console.error('Error getting exchange rate:', error);
-    
+
     // Fallback to static rates
     const fromRate = FALLBACK_RATES[fromCurrency] || 1.0;
     const toRate = FALLBACK_RATES[toCurrency] || 1.0;
@@ -212,13 +256,15 @@ export const getExchangeRate = async (fromCurrency: string, toCurrency: string =
 };
 
 // Get specific currency rate to USD
-export const getCurrencyToUSDRate = async (currency: string): Promise<number> => {
+export const getCurrencyToUSDRate = async (
+  currency: string,
+): Promise<number> => {
   if (currency === 'USD') return 1.0;
-  
+
   try {
     const rates = await fetchLiveExchangeRates();
     const rate = rates[currency] || FALLBACK_RATES[currency] || 1.0;
-    
+
     // Return how much 1 unit of currency equals in USD
     return 1 / rate;
   } catch (error) {
@@ -229,60 +275,72 @@ export const getCurrencyToUSDRate = async (currency: string): Promise<number> =>
 };
 
 // Convert currency amount
-export const convertCurrency = async (amount: number, fromCurrency: string, toCurrency: string = 'USD'): Promise<number> => {
+export const convertCurrency = async (
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string = 'USD',
+): Promise<number> => {
   const rate = await getExchangeRate(fromCurrency, toCurrency);
   return amount * rate;
 };
 
 // Convert to USD specifically (most common use case)
-export const convertToUSD = async (amount: number, fromCurrency: string): Promise<number> => {
+export const convertToUSD = async (
+  amount: number,
+  fromCurrency: string,
+): Promise<number> => {
   if (fromCurrency === 'USD') return amount;
-  
+
   const usdRate = await getCurrencyToUSDRate(fromCurrency);
   return amount * usdRate;
 };
 
 // Get exchange rate info for display
-export const getExchangeRateInfo = async (currency: string): Promise<{
+export const getExchangeRateInfo = async (
+  currency: string,
+): Promise<{
   rate: number;
   usdEquivalent: number;
   timestamp: number;
   source: string;
 }> => {
   try {
-    const response = await fetch(`${supabaseUrl}/functions/v1/get-exchange-rates?currency=${currency}`, {
-      headers: {
-        'Authorization': `Bearer ${supabaseAnonKey}`,
-        'Content-Type': 'application/json',
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/get-exchange-rates?currency=${currency}`,
+      {
+        headers: {
+          Authorization: `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+        },
       },
-    });
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
-    
+
     if (data.success) {
       return {
         rate: data.rate,
         usdEquivalent: data.usdEquivalent,
         timestamp: data.timestamp,
-        source: data.source
+        source: data.source,
       };
     } else {
       throw new Error(data.error || 'Failed to get exchange rate info');
     }
   } catch (error) {
     console.error('Error getting exchange rate info:', error);
-    
+
     // Fallback
     const rate = FALLBACK_RATES[currency] || 1.0;
     return {
       rate: rate,
       usdEquivalent: 1 / rate,
       timestamp: Date.now(),
-      source: 'fallback'
+      source: 'fallback',
     };
   }
 };
@@ -330,9 +388,19 @@ export interface UserProfile {
   user_id: string;
   email: string;
   name: string;
-  role: 'Admin' | 'Submitter' | 'Approver_L1' | 'Approver_L2' | 'Approver_L3' | 'Approver_L4' | 
-        'Sustainability_Officer' | 'CFO' | 'Legal_Officer' | 'Compliance_Officer' | 
-        'Business_Development' | 'Asset_Manager';
+  role:
+    | 'Admin'
+    | 'Submitter'
+    | 'Approver_L1'
+    | 'Approver_L2'
+    | 'Approver_L3'
+    | 'Approver_L4'
+    | 'Sustainability_Officer'
+    | 'CFO'
+    | 'Legal_Officer'
+    | 'Compliance_Officer'
+    | 'Business_Development'
+    | 'Asset_Manager';
   department: string;
   active: boolean;
   created_at: string;
@@ -443,5 +511,49 @@ export interface SupportingDocument {
   size: number;
   uploadDate: string;
   description?: string;
-  category: 'ESG_Report' | 'Business_Plan' | 'Financial_Projection' | 'Compliance_Document' | 'Other';
+  category:
+    | 'ESG_Report'
+    | 'Business_Plan'
+    | 'Financial_Projection'
+    | 'Compliance_Document'
+    | 'Other';
 }
+
+/**
+ * Format numbers according to industry standards (K, M, B, T)
+ * Examples: 1500 -> 1.5K, 2500000 -> 2.5M, 1500000000 -> 1.5B
+ */
+export const formatNumber = (num: number): string => {
+  if (num === 0) return '0';
+
+  const absNum = Math.abs(num);
+  const sign = num < 0 ? '-' : '';
+
+  let formatted: string;
+
+  if (absNum >= 1e12) {
+    formatted = `${(absNum / 1e12).toFixed(1)}T`;
+  } else if (absNum >= 1e9) {
+    formatted = `${(absNum / 1e9).toFixed(1)}B`;
+  } else if (absNum >= 1e6) {
+    formatted = `${(absNum / 1e6).toFixed(1)}M`;
+  } else if (absNum >= 1e3) {
+    formatted = `${(absNum / 1e3).toFixed(1)}K`;
+  } else {
+    formatted = absNum.toLocaleString();
+  }
+
+  return `${sign}${formatted}`;
+};
+
+/**
+ * Format currency amounts with proper symbol and number formatting
+ */
+export const formatCurrencyAmount = (
+  amount: number,
+  currency: string,
+): string => {
+  const symbol = getCurrencySymbol(currency);
+  const formatted = formatNumber(amount);
+  return `${symbol}${formatted}`;
+};

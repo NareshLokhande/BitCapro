@@ -1364,6 +1364,7 @@ const AdminPanel: React.FC = () => {
                   <MessageSquare className="w-4 h-4 mr-2" />
                   Test Rejection Notification
                 </button>
+                <br />
 
                 <button
                   onClick={testApproverNotification}

@@ -26,6 +26,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useInvestmentRequests, useKPIs } from '../hooks/useSupabase';
 import { CarbonFootprintData, CarbonImpactResult } from '../lib/esgCalculator';
+import {
+  calculateFinancialMetrics,
+  estimateAnnualCashInflow,
+  getDefaultDiscountRate,
+} from '../lib/financialCalculator';
 import { NotificationManager } from '../lib/notificationManager';
 import {
   BUSINESS_CASE_TYPES,
@@ -35,8 +40,10 @@ import {
   convertToUSD,
   getCurrencySymbol,
 } from '../lib/supabase';
+import { ValidationResult } from '../lib/validationRules';
 import ESGImpactCalculator from './ESGImpactCalculator';
 import StyledDropdown from './StyledDropdown';
+import ValidationPanel from './ValidationPanel';
 
 const SubmitRequest: React.FC = () => {
   const navigate = useNavigate();
@@ -84,6 +91,7 @@ const SubmitRequest: React.FC = () => {
     npv: '',
     payback_period: '',
     basis_of_calculation: '',
+    discount_rate: '',
 
     // Multi-year breakdown
     yearly_breakdown: {} as Record<string, { capex: number; opex: number }>,
@@ -100,6 +108,8 @@ const SubmitRequest: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [esgImpactResult, setEsgImpactResult] =
     useState<CarbonImpactResult | null>(null);
+  const [validationResult, setValidationResult] =
+    useState<ValidationResult | null>(null);
 
   // Load draft data from sessionStorage when component mounts
   useEffect(() => {
@@ -136,6 +146,7 @@ const SubmitRequest: React.FC = () => {
           npv: '',
           payback_period: '',
           basis_of_calculation: '',
+          discount_rate: '',
           yearly_breakdown: editingDraft.yearly_breakdown || {},
           carbon_footprint_data:
             (editingDraft.carbon_footprint_data as CarbonFootprintData) ||
@@ -202,6 +213,11 @@ const SubmitRequest: React.FC = () => {
         ...prev,
         [name]: checked,
       }));
+
+      // Trigger budget validation when "Is In Budget" checkbox changes
+      if (name === 'is_in_budget') {
+        validateBudgetBreakdown(checked);
+      }
     } else {
       setFormData((prev) => ({
         ...prev,
@@ -214,6 +230,45 @@ const SubmitRequest: React.FC = () => {
       setErrors((prev) => ({
         ...prev,
         [name]: '',
+      }));
+    }
+  };
+
+  const validateBudgetBreakdown = (isInBudget: boolean) => {
+    if (!isInBudget || getYearRange().length <= 1) {
+      // Clear yearly breakdown error if not in budget or single year project
+      setErrors((prev) => ({
+        ...prev,
+        yearly_breakdown: '',
+      }));
+      return;
+    }
+
+    const totalBudget =
+      (parseFloat(formData.capex) || 0) + (parseFloat(formData.opex) || 0);
+    const yearlyBreakdownTotal = Object.values(
+      formData.yearly_breakdown,
+    ).reduce(
+      (sum, yearData) => sum + (yearData.capex || 0) + (yearData.opex || 0),
+      0,
+    );
+
+    if (yearlyBreakdownTotal > totalBudget) {
+      setErrors((prev) => ({
+        ...prev,
+        yearly_breakdown: `Total yearly breakdown amount (${formatCurrencyAmount(
+          yearlyBreakdownTotal,
+          formData.currency,
+        )}) exceeds the available CapEx + OpEx budget (${formatCurrencyAmount(
+          totalBudget,
+          formData.currency,
+        )}). Please revise the breakdown to stay within budget.`,
+      }));
+    } else {
+      // Clear error if validation passes
+      setErrors((prev) => ({
+        ...prev,
+        yearly_breakdown: '',
       }));
     }
   };
@@ -243,6 +298,14 @@ const SubmitRequest: React.FC = () => {
         },
       },
     }));
+
+    // Trigger budget validation if "Is In Budget" is checked
+    if (formData.is_in_budget) {
+      // Use setTimeout to ensure state is updated before validation
+      setTimeout(() => {
+        validateBudgetBreakdown(true);
+      }, 0);
+    }
   };
 
   const handleESGDataChange = (
@@ -259,21 +322,71 @@ const SubmitRequest: React.FC = () => {
   const calculateFinancials = () => {
     const capex = parseFloat(formData.capex) || 0;
     const opex = parseFloat(formData.opex) || 0;
-    const totalCost = capex + opex;
+    const totalInvestment = capex + opex;
 
-    if (totalCost > 0) {
-      // Simple financial calculations
-      const annualSavings = totalCost * 0.15; // Assuming 15% annual savings
-      const irr = (annualSavings / totalCost) * 100;
-      const payback = totalCost / annualSavings;
-      const npv = annualSavings * 5 - totalCost; // Simple 5-year NPV
+    if (totalInvestment <= 0) {
+      showErrorMessage(
+        'Please enter valid CapEx and OpEx amounts before calculating KPIs',
+      );
+      return;
+    }
 
+    try {
+      // Get project duration
+      const projectDuration = formData.end_year - formData.start_year + 1;
+
+      // Get discount rate (use default if not provided)
+      let discountRate = parseFloat(formData.discount_rate) / 100;
+      if (!formData.discount_rate || isNaN(discountRate)) {
+        discountRate = getDefaultDiscountRate(formData.business_case_type);
+        setFormData((prev) => ({
+          ...prev,
+          discount_rate: (discountRate * 100).toFixed(1),
+        }));
+      }
+
+      // Estimate annual cash inflow based on project characteristics
+      const annualCashInflow = estimateAnnualCashInflow(
+        totalInvestment,
+        formData.business_case_type,
+        projectDuration,
+      );
+
+      // Calculate financial metrics using proper formulas
+      const metrics = calculateFinancialMetrics({
+        initialInvestment: totalInvestment,
+        discountRate,
+        projectDuration,
+        annualCashInflow,
+        yearlyBreakdown: formData.yearly_breakdown,
+      });
+
+      // Update form with calculated values
       setFormData((prev) => ({
         ...prev,
-        irr: irr.toFixed(1),
-        payback_period: payback.toFixed(1),
-        npv: npv.toFixed(0),
+        irr: metrics.irr.toFixed(1),
+        npv: metrics.npv.toFixed(0),
+        payback_period: metrics.paybackPeriod.toFixed(1),
+        basis_of_calculation: `Calculated using: Initial Investment: ${getCurrencySymbol(
+          formData.currency,
+        )}${totalInvestment.toLocaleString()}, Annual Cash Inflow: ${getCurrencySymbol(
+          formData.currency,
+        )}${annualCashInflow.toFixed(0)}, Discount Rate: ${(
+          discountRate * 100
+        ).toFixed(
+          1,
+        )}%, Project Duration: ${projectDuration} years. IRR calculated using Newton-Raphson method, NPV using standard DCF formula, Payback Period with partial year interpolation.`,
       }));
+
+      // Show success message
+      showSuccessMessage();
+    } catch (error) {
+      console.error('Error calculating financial metrics:', error);
+      const errorMsg =
+        error instanceof Error
+          ? error.message
+          : 'Failed to calculate financial metrics';
+      showErrorMessage(errorMsg);
     }
   };
 
@@ -326,6 +439,30 @@ const SubmitRequest: React.FC = () => {
           newErrors.capex = 'Valid CapEx amount is required';
         if (!formData.opex || parseFloat(formData.opex) < 0)
           newErrors.opex = 'Valid OpEx amount is required';
+
+        // Budget validation for yearly breakdown
+        if (formData.is_in_budget && getYearRange().length > 1) {
+          const totalBudget =
+            (parseFloat(formData.capex) || 0) +
+            (parseFloat(formData.opex) || 0);
+          const yearlyBreakdownTotal = Object.values(
+            formData.yearly_breakdown,
+          ).reduce(
+            (sum, yearData) =>
+              sum + (yearData.capex || 0) + (yearData.opex || 0),
+            0,
+          );
+
+          if (yearlyBreakdownTotal > totalBudget) {
+            newErrors.yearly_breakdown = `Total yearly breakdown amount (${formatCurrencyAmount(
+              yearlyBreakdownTotal,
+              formData.currency,
+            )}) exceeds the available CapEx + OpEx budget (${formatCurrencyAmount(
+              totalBudget,
+              formData.currency,
+            )}). Please revise the breakdown to stay within budget.`;
+          }
+        }
         break;
     }
 
@@ -643,6 +780,7 @@ const SubmitRequest: React.FC = () => {
           npv: '',
           payback_period: '',
           basis_of_calculation: '',
+          discount_rate: '',
           yearly_breakdown: {},
           carbon_footprint_data: {} as CarbonFootprintData,
           stock_exchange_target: '',
@@ -706,6 +844,18 @@ const SubmitRequest: React.FC = () => {
     }
   };
 
+  const formatCurrencyAmount = (amount: number, currency: string): string => {
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+    });
+    return formatter.format(amount);
+  };
+
+  const formatNumber = (value: number): string => {
+    return new Intl.NumberFormat('en-US').format(value);
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       {/* Success Message */}
@@ -751,49 +901,54 @@ const SubmitRequest: React.FC = () => {
       )}
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-8 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <button
-                onClick={handleBackToDrafts}
-                className="flex items-center text-blue-100 hover:text-white transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Back to Drafts
-              </button>
-              {isEditing && (
-                <span className="inline-flex items-center px-3 py-1 bg-blue-500 text-white text-sm rounded-full">
-                  <Clock className="w-4 h-4 mr-1" />
-                  Editing Draft
-                </span>
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 rounded-2xl p-8 text-white shadow-xl">
+        {/* Removed the absolute black overlay */}
+        <div className="relative z-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <button
+                  onClick={handleBackToDrafts}
+                  className="flex items-center text-blue-100 hover:text-white transition-colors bg-white/10 px-4 py-2 rounded-xl hover:bg-white/20"
+                >
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Back to Drafts
+                </button>
+                {isEditing && (
+                  <span className="inline-flex items-center px-4 py-2 bg-white/20 text-white text-sm rounded-xl backdrop-blur-sm">
+                    <Clock className="w-4 h-4 mr-2" />
+                    Editing Draft
+                  </span>
+                )}
+              </div>
+              <h1 className="text-4xl font-bold mb-3">
+                {isEditing
+                  ? 'Edit Investment Request'
+                  : 'Submit Investment Request'}
+              </h1>
+              <p className="text-blue-100 text-lg">
+                {isEditing
+                  ? 'Update your draft investment proposal with any changes'
+                  : 'Create a comprehensive investment proposal with detailed analysis and ESG impact assessment'}
+              </p>
+              {profile && (
+                <div className="mt-6 flex items-center bg-white/10 px-4 py-3 rounded-xl backdrop-blur-sm">
+                  <span className="text-blue-200">Submitting as:</span>
+                  <span className="ml-2 font-semibold text-white">
+                    {profile.name}
+                  </span>
+                  <span className="ml-2 text-blue-200">
+                    ({profile.department})
+                  </span>
+                </div>
               )}
             </div>
-            <h1 className="text-3xl font-bold mb-2">
-              {isEditing
-                ? 'Edit Investment Request'
-                : 'Submit Investment Request'}
-            </h1>
-            <p className="text-blue-100">
-              {isEditing
-                ? 'Update your draft investment proposal with any changes'
-                : 'Create a comprehensive investment proposal with detailed analysis and ESG impact assessment'}
-            </p>
-            {profile && (
-              <div className="mt-4 flex items-center">
-                <span className="text-blue-200">Submitting as:</span>
-                <span className="ml-2 font-semibold">{profile.name}</span>
-                <span className="ml-2 text-blue-200">
-                  ({profile.department})
-                </span>
-              </div>
-            )}
           </div>
         </div>
       </div>
 
       {/* Progress Steps */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
         <div className="flex items-center justify-between">
           {steps.map((step, index) => {
             const Icon = step.icon;
@@ -803,23 +958,23 @@ const SubmitRequest: React.FC = () => {
             return (
               <div key={step.id} className="flex items-center">
                 <div
-                  className={`flex items-center justify-center w-12 h-12 rounded-xl border-2 transition-all ${
+                  className={`flex items-center justify-center w-12 h-14 rounded-2xl border-2 transition-all duration-300 ${
                     isActive
-                      ? 'bg-blue-600 border-blue-600 text-white'
+                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 border-blue-600 text-white shadow-lg scale-120'
                       : isCompleted
-                      ? 'bg-green-600 border-green-600 text-white'
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 border-green-600 text-white shadow-lg'
                       : 'bg-gray-100 border-gray-300 text-gray-400'
                   }`}
                 >
                   {isCompleted ? (
-                    <CheckCircle className="w-6 h-6" />
+                    <CheckCircle className="w-8 h-8" />
                   ) : (
-                    <Icon className="w-6 h-6" />
+                    <Icon className="w-8 h-8" />
                   )}
                 </div>
                 <div className="ml-4 hidden md:block">
                   <p
-                    className={`text-sm font-medium ${
+                    className={`text-sm font-bold ${
                       isActive
                         ? 'text-blue-600'
                         : isCompleted
@@ -832,7 +987,13 @@ const SubmitRequest: React.FC = () => {
                   <p className="text-xs text-gray-500">{step.description}</p>
                 </div>
                 {index < steps.length - 1 && (
-                  <ChevronRight className="w-5 h-5 text-gray-300 mx-4" />
+                  <div className="mx-4 flex items-center">
+                    <ChevronRight
+                      className={`w-5 h-5 mx-2 transition-colors duration-300 ${
+                        isCompleted ? 'text-green-500' : 'text-gray-300'
+                      }`}
+                    />
+                  </div>
                 )}
               </div>
             );
@@ -1009,6 +1170,8 @@ const SubmitRequest: React.FC = () => {
                   <option value="Process Improvement">
                     Process Improvement
                   </option>
+                  <option value="R&D">R&D</option>
+                  <option value="Maintenance">Maintenance</option>
                 </StyledDropdown>
                 {errors.category && (
                   <p className="mt-1 text-sm text-red-600">{errors.category}</p>
@@ -1235,12 +1398,17 @@ const SubmitRequest: React.FC = () => {
 
         {/* Step 3: Financial Data */}
         {currentStep === 3 && (
-          <div className="space-y-6">
+          <div className="space-y-8">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Financial Information
-              </h2>
-              <div className="flex items-center">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  Financial Information
+                </h2>
+                <p className="text-gray-600">
+                  Enter investment amounts and project timeline
+                </p>
+              </div>
+              <div className="flex items-center bg-blue-50 px-4 py-2 rounded-xl border border-blue-200">
                 <input
                   type="checkbox"
                   id="is_in_budget"
@@ -1251,216 +1419,377 @@ const SubmitRequest: React.FC = () => {
                 />
                 <label
                   htmlFor="is_in_budget"
-                  className="ml-2 block text-sm text-gray-900"
+                  className="ml-2 block text-sm font-medium text-blue-900"
                 >
                   Is In Budget
                 </label>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div>
-                <label
-                  htmlFor="currency"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Currency
-                </label>
-                <StyledDropdown
-                  id="currency"
-                  name="currency"
-                  value={formData.currency}
-                  onChange={handleInputChange}
-                >
-                  {SUPPORTED_CURRENCIES.map((currency) => (
-                    <option key={currency.code} value={currency.code}>
-                      {currency.code} - {currency.name}
-                    </option>
-                  ))}
-                </StyledDropdown>
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Financial Inputs */}
+              <div className="lg:col-span-2 space-y-8">
+                {/* Currency and Basic Financials */}
+                <div className="bg-gradient-to-br from-slate-50 to-blue-50 border border-slate-200 rounded-2xl p-6 shadow-sm">
+                  <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center">
+                    <DollarSign className="w-5 h-5 mr-3 text-blue-600" />
+                    Investment Details
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label
+                        htmlFor="currency"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
+                        Currency
+                      </label>
+                      <StyledDropdown
+                        id="currency"
+                        name="currency"
+                        value={formData.currency}
+                        onChange={handleInputChange}
+                      >
+                        {SUPPORTED_CURRENCIES.map((currency) => (
+                          <option key={currency.code} value={currency.code}>
+                            {currency.code} - {currency.name}
+                          </option>
+                        ))}
+                      </StyledDropdown>
+                    </div>
 
-              <div>
-                <label
-                  htmlFor="capex"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Capital Expenditure (CapEx) * (
-                  {getCurrencySymbol(formData.currency)})
-                </label>
-                <input
-                  type="number"
-                  id="capex"
-                  name="capex"
-                  value={formData.capex}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                    errors.capex ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  placeholder="0"
-                  min="0"
-                  step="0.01"
-                />
-                {errors.capex && (
-                  <p className="mt-1 text-sm text-red-600">{errors.capex}</p>
-                )}
-              </div>
+                    <div>
+                      <label
+                        htmlFor="capex"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
+                        Capital Expenditure (CapEx) * (
+                        {getCurrencySymbol(formData.currency)})
+                      </label>
+                      <input
+                        type="number"
+                        id="capex"
+                        name="capex"
+                        value={formData.capex}
+                        onChange={handleInputChange}
+                        className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+                          errors.capex ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                        placeholder="0"
+                        min="0"
+                        step="0.01"
+                      />
+                      {errors.capex && (
+                        <p className="mt-1 text-sm text-red-600">
+                          {errors.capex}
+                        </p>
+                      )}
+                    </div>
 
-              <div>
-                <label
-                  htmlFor="opex"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Operating Expenditure (OpEx) * (
-                  {getCurrencySymbol(formData.currency)})
-                </label>
-                <input
-                  type="number"
-                  id="opex"
-                  name="opex"
-                  value={formData.opex}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                    errors.opex ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  placeholder="0"
-                  min="0"
-                  step="0.01"
-                />
-                {errors.opex && (
-                  <p className="mt-1 text-sm text-red-600">{errors.opex}</p>
-                )}
-              </div>
+                    <div>
+                      <label
+                        htmlFor="opex"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
+                        Operating Expenditure (OpEx) * (
+                        {getCurrencySymbol(formData.currency)})
+                      </label>
+                      <input
+                        type="number"
+                        id="opex"
+                        name="opex"
+                        value={formData.opex}
+                        onChange={handleInputChange}
+                        className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+                          errors.opex ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                        placeholder="0"
+                        min="0"
+                        step="0.01"
+                      />
+                      {errors.opex && (
+                        <p className="mt-1 text-sm text-red-600">
+                          {errors.opex}
+                        </p>
+                      )}
+                    </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Total Cost ({getCurrencySymbol(formData.currency)})
-                </label>
-                <div className="w-full px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 font-semibold text-lg">
-                  {getCurrencySymbol(formData.currency)}
-                  {totalCost.toLocaleString()}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Total Cost ({getCurrencySymbol(formData.currency)})
+                      </label>
+                      <div className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-bold text-lg shadow-lg text-center">
+                        {formatCurrencyAmount(totalCost, formData.currency)}
+                      </div>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Timeline */}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6 shadow-sm">
+                  <h3 className="text-lg font-bold text-green-900 mb-6 flex items-center">
+                    <Clock className="w-5 h-5 mr-3 text-green-600" />
+                    Project Timeline
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label
+                        htmlFor="start_year"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
+                        Start Year
+                      </label>
+                      <input
+                        type="number"
+                        id="start_year"
+                        name="start_year"
+                        value={formData.start_year}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                        min={new Date().getFullYear()}
+                        max={new Date().getFullYear() + 10}
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="end_year"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
+                        End Year
+                      </label>
+                      <input
+                        type="number"
+                        id="end_year"
+                        name="end_year"
+                        value={formData.end_year}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                        min={formData.start_year}
+                        max={new Date().getFullYear() + 15}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 p-3 bg-green-100 rounded-xl">
+                    <div className="text-sm text-green-800">
+                      <strong>Project Duration:</strong>{' '}
+                      {formData.end_year - formData.start_year + 1} year
+                      {formData.end_year - formData.start_year + 1 > 1
+                        ? 's'
+                        : ''}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Multi-year breakdown */}
+                {getYearRange().length > 1 && (
+                  <div
+                    className={`bg-gradient-to-br from-purple-50 to-indigo-50 border rounded-2xl p-6 shadow-sm ${
+                      errors.yearly_breakdown
+                        ? 'border-red-300 bg-red-50'
+                        : 'border-purple-200'
+                    }`}
+                  >
+                    <h3 className="text-lg font-bold text-purple-900 mb-6 flex items-center">
+                      <BarChart3 className="w-5 h-5 mr-3 text-purple-600" />
+                      Yearly Investment Breakdown
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table
+                        className={`min-w-full divide-y divide-purple-200 border rounded-xl bg-white shadow-sm ${
+                          errors.yearly_breakdown
+                            ? 'border-red-300'
+                            : 'border-purple-200'
+                        }`}
+                      >
+                        <thead className="bg-gradient-to-r from-purple-500 to-indigo-500">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                              Year
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                              CapEx ({getCurrencySymbol(formData.currency)})
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                              OpEx ({getCurrencySymbol(formData.currency)})
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                              Total ({getCurrencySymbol(formData.currency)})
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-purple-100">
+                          {getYearRange().map((year) => {
+                            const yearData = formData.yearly_breakdown[
+                              year
+                            ] || {
+                              capex: 0,
+                              opex: 0,
+                            };
+                            return (
+                              <tr
+                                key={year}
+                                className={`hover:bg-purple-50 transition-colors ${
+                                  errors.yearly_breakdown
+                                    ? 'hover:bg-red-50'
+                                    : ''
+                                }`}
+                              >
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  {year}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <input
+                                    type="number"
+                                    value={yearData.capex || ''}
+                                    onChange={(e) =>
+                                      handleYearlyBreakdownChange(
+                                        year,
+                                        'capex',
+                                        e.target.value,
+                                      )
+                                    }
+                                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
+                                      errors.yearly_breakdown
+                                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                                        : 'border-gray-300'
+                                    }`}
+                                    placeholder="0"
+                                    min="0"
+                                    step="0.01"
+                                  />
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <input
+                                    type="number"
+                                    value={yearData.opex || ''}
+                                    onChange={(e) =>
+                                      handleYearlyBreakdownChange(
+                                        year,
+                                        'opex',
+                                        e.target.value,
+                                      )
+                                    }
+                                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
+                                      errors.yearly_breakdown
+                                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                                        : 'border-gray-300'
+                                    }`}
+                                    placeholder="0"
+                                    min="0"
+                                    step="0.01"
+                                  />
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  {formatCurrencyAmount(
+                                    yearData.capex + yearData.opex,
+                                    formData.currency,
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    {errors.yearly_breakdown && (
+                      <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+                        <div className="flex items-start">
+                          <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
+                          <p className="text-red-700 text-sm">
+                            {errors.yearly_breakdown}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Budget Summary */}
+                    {formData.is_in_budget && getYearRange().length > 1 && (
+                      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                        <h4 className="text-sm font-semibold text-blue-900 mb-3">
+                          Budget Summary
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-blue-700">Total Budget:</span>
+                            <span className="font-semibold text-blue-900">
+                              {formatCurrencyAmount(
+                                (parseFloat(formData.capex) || 0) +
+                                  (parseFloat(formData.opex) || 0),
+                                formData.currency,
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-blue-700">
+                              Yearly Breakdown Total:
+                            </span>
+                            <span
+                              className={`font-semibold ${
+                                Object.values(formData.yearly_breakdown).reduce(
+                                  (sum, yearData) =>
+                                    sum +
+                                    (yearData.capex || 0) +
+                                    (yearData.opex || 0),
+                                  0,
+                                ) >
+                                (parseFloat(formData.capex) || 0) +
+                                  (parseFloat(formData.opex) || 0)
+                                  ? 'text-red-600'
+                                  : 'text-green-600'
+                              }`}
+                            >
+                              {formatCurrencyAmount(
+                                Object.values(formData.yearly_breakdown).reduce(
+                                  (sum, yearData) =>
+                                    sum +
+                                    (yearData.capex || 0) +
+                                    (yearData.opex || 0),
+                                  0,
+                                ),
+                                formData.currency,
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label
-                  htmlFor="start_year"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Start Year
-                </label>
-                <input
-                  type="number"
-                  id="start_year"
-                  name="start_year"
-                  value={formData.start_year}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  min={new Date().getFullYear()}
-                  max={new Date().getFullYear() + 10}
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="end_year"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  End Year
-                </label>
-                <input
-                  type="number"
-                  id="end_year"
-                  name="end_year"
-                  value={formData.end_year}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  min={formData.start_year}
-                  max={new Date().getFullYear() + 15}
+              {/* Validation Panel */}
+              <div className="lg:col-span-1">
+                <ValidationPanel
+                  capex={parseFloat(formData.capex) || 0}
+                  opex={parseFloat(formData.opex) || 0}
+                  totalCost={totalCost}
+                  category={formData.category}
+                  currency={formData.currency}
+                  onValidationChange={setValidationResult}
                 />
               </div>
             </div>
 
-            {/* Multi-year breakdown */}
-            {getYearRange().length > 1 && (
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Yearly Investment Breakdown
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-xl">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Year
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          CapEx ({getCurrencySymbol(formData.currency)})
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          OpEx ({getCurrencySymbol(formData.currency)})
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Total ({getCurrencySymbol(formData.currency)})
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {getYearRange().map((year) => {
-                        const yearData = formData.yearly_breakdown[year] || {
-                          capex: 0,
-                          opex: 0,
-                        };
-                        return (
-                          <tr key={year}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {year}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <input
-                                type="number"
-                                value={yearData.capex || ''}
-                                onChange={(e) =>
-                                  handleYearlyBreakdownChange(
-                                    year,
-                                    'capex',
-                                    e.target.value,
-                                  )
-                                }
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="0"
-                                min="0"
-                                step="0.01"
-                              />
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <input
-                                type="number"
-                                value={yearData.opex || ''}
-                                onChange={(e) =>
-                                  handleYearlyBreakdownChange(
-                                    year,
-                                    'opex',
-                                    e.target.value,
-                                  )
-                                }
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="0"
-                                min="0"
-                                step="0.01"
-                              />
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {getCurrencySymbol(formData.currency)}
-                              {(
-                                yearData.capex + yearData.opex
-                              ).toLocaleString()}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+            {/* Validation Error Summary */}
+            {validationResult && !validationResult.isValid && (
+              <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-2xl p-6 shadow-sm">
+                <div className="flex items-start">
+                  <AlertCircle className="w-6 h-6 text-red-600 mr-4 mt-1 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h3 className="text-red-800 font-bold text-lg mb-3">
+                      Validation Errors
+                    </h3>
+                    <ul className="text-red-700 text-sm space-y-2">
+                      {validationResult.errors.map(
+                        (error: string, index: number) => (
+                          <li key={index} className="flex items-start">
+                            <span className="w-2 h-2 bg-red-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                            {error}
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                  </div>
                 </div>
               </div>
             )}
@@ -1469,115 +1798,203 @@ const SubmitRequest: React.FC = () => {
 
         {/* Step 4: KPIs & Analysis */}
         {currentStep === 4 && (
-          <div className="space-y-6">
+          <div className="space-y-8">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Key Performance Indicators
-              </h2>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  Key Performance Indicators
+                </h2>
+                <p className="text-gray-600">
+                  Calculate and review financial metrics for your investment
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={calculateFinancials}
-                className="flex items-center px-4 py-2 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-colors"
+                className="flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
               >
-                <Calculator className="w-4 h-4 mr-2" />
+                <Calculator className="w-5 h-5 mr-2" />
                 Calculate KPIs
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label
-                  htmlFor="irr"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Internal Rate of Return (IRR) (%)
-                </label>
-                <input
-                  type="number"
-                  id="irr"
-                  name="irr"
-                  value={formData.irr}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="0.0"
-                  step="0.1"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="npv"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Net Present Value (NPV) (
-                  {getCurrencySymbol(formData.currency)})
-                </label>
-                <input
-                  type="number"
-                  id="npv"
-                  name="npv"
-                  value={formData.npv}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="0"
-                  step="1"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="payback_period"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Payback Period (Years)
-                </label>
-                <input
-                  type="number"
-                  id="payback_period"
-                  name="payback_period"
-                  value={formData.payback_period}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="0.0"
-                  step="0.1"
-                />
+            {/* Discount Rate Input */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-blue-900 mb-6 flex items-center">
+                <TrendingUp className="w-5 h-5 mr-3 text-blue-600" />
+                Discount Rate Configuration
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                  <label
+                    htmlFor="discount_rate"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
+                    Discount Rate (Cost of Capital) (%)
+                  </label>
+                  <input
+                    type="number"
+                    id="discount_rate"
+                    name="discount_rate"
+                    value={formData.discount_rate}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    placeholder="10.0"
+                    step="0.1"
+                    min="0"
+                    max="50"
+                  />
+                  <p className="text-sm text-gray-600 mt-2 p-3 bg-blue-100 rounded-lg">
+                    {formData.business_case_type.length > 0
+                      ? `Default rate for ${formData.business_case_type.join(
+                          ', ',
+                        )}: ${(
+                          getDefaultDiscountRate(formData.business_case_type) *
+                          100
+                        ).toFixed(1)}%`
+                      : 'Enter your cost of capital or leave blank for default rate'}
+                  </p>
+                </div>
+                <div className="flex items-center justify-center">
+                  <div className="text-center bg-white p-6 rounded-2xl shadow-sm border border-blue-200">
+                    <div className="text-4xl font-bold text-blue-600 mb-2">
+                      {formData.discount_rate
+                        ? parseFloat(formData.discount_rate).toFixed(1)
+                        : (
+                            getDefaultDiscountRate(
+                              formData.business_case_type,
+                            ) * 100
+                          ).toFixed(1)}
+                      %
+                    </div>
+                    <div className="text-sm font-semibold text-blue-700">
+                      Effective Rate
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      Used for NPV calculations
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div>
-              <label
-                htmlFor="basis_of_calculation"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Basis of Calculation
-              </label>
-              <textarea
-                id="basis_of_calculation"
-                name="basis_of_calculation"
-                rows={4}
-                value={formData.basis_of_calculation}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder="Explain the basis for your financial calculations and assumptions"
-              />
+            {/* KPI Metrics */}
+            <div className="bg-gradient-to-br from-slate-50 to-gray-50 border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center">
+                <BarChart3 className="w-5 h-5 mr-3 text-slate-600" />
+                Financial Metrics
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                  <label
+                    htmlFor="irr"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
+                    Internal Rate of Return (IRR) (%)
+                  </label>
+                  <input
+                    type="number"
+                    id="irr"
+                    name="irr"
+                    value={formData.irr}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-lg font-semibold"
+                    placeholder="0.0"
+                    step="0.1"
+                  />
+                  <div className="mt-2 text-xs text-gray-500">
+                    Annualized return rate
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                  <label
+                    htmlFor="npv"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
+                    Net Present Value (NPV) (
+                    {getCurrencySymbol(formData.currency)})
+                  </label>
+                  <input
+                    type="number"
+                    id="npv"
+                    name="npv"
+                    value={formData.npv}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-lg font-semibold"
+                    placeholder="0"
+                    step="1"
+                  />
+                  <div className="mt-2 text-xs text-gray-500">
+                    Present value of cash flows
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                  <label
+                    htmlFor="payback_period"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
+                    Payback Period (Years)
+                  </label>
+                  <input
+                    type="number"
+                    id="payback_period"
+                    name="payback_period"
+                    value={formData.payback_period}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-lg font-semibold"
+                    placeholder="0.0"
+                    step="0.1"
+                  />
+                  <div className="mt-2 text-xs text-gray-500">
+                    Time to recover investment
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Calculation Basis */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-green-900 mb-4 flex items-center">
+                <FileText className="w-5 h-5 mr-3 text-green-600" />
+                Calculation Basis
+              </h3>
+              <div>
+                <label
+                  htmlFor="basis_of_calculation"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Basis of Calculation
+                </label>
+                <textarea
+                  id="basis_of_calculation"
+                  name="basis_of_calculation"
+                  rows={4}
+                  value={formData.basis_of_calculation}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                  placeholder="Explain the basis for your financial calculations and assumptions"
+                />
+              </div>
             </div>
 
             {/* ESG Impact Summary */}
             {esgImpactResult && formData.business_case_type.includes('ESG') && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-green-900 mb-4 flex items-center">
-                  <Leaf className="w-5 h-5 mr-2" />
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6 shadow-sm">
+                <h3 className="text-lg font-bold text-green-900 mb-6 flex items-center">
+                  <Leaf className="w-5 h-5 mr-3 text-green-600" />
                   ESG Impact Summary
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="text-center">
+                  <div className="bg-white p-4 rounded-xl text-center shadow-sm border border-green-200">
                     <div className="text-2xl font-bold text-green-600">
                       {esgImpactResult.totalEmissions.toFixed(1)}
                     </div>
                     <div className="text-sm text-green-700">tons CO₂e</div>
                     <div className="text-xs text-gray-600">Total Emissions</div>
                   </div>
-                  <div className="text-center">
+                  <div className="bg-white p-4 rounded-xl text-center shadow-sm border border-green-200">
                     <div className="text-2xl font-bold text-green-600">
                       {esgImpactResult.reductionPotential.toFixed(1)}
                     </div>
@@ -1586,14 +2003,14 @@ const SubmitRequest: React.FC = () => {
                       Reduction Potential
                     </div>
                   </div>
-                  <div className="text-center">
+                  <div className="bg-white p-4 rounded-xl text-center shadow-sm border border-green-200">
                     <div className="text-2xl font-bold text-green-600">
-                      ${esgImpactResult.offsetCost.toLocaleString()}
+                      ${formatNumber(esgImpactResult.offsetCost)}
                     </div>
                     <div className="text-sm text-green-700">USD</div>
                     <div className="text-xs text-gray-600">Offset Cost</div>
                   </div>
-                  <div className="text-center">
+                  <div className="bg-white p-4 rounded-xl text-center shadow-sm border border-green-200">
                     <div className="text-2xl font-bold text-green-600">
                       {esgImpactResult.esgScore}/100
                     </div>

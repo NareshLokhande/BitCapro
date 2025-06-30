@@ -27,7 +27,11 @@ import {
   useKPIs,
 } from '../hooks/useSupabase';
 import { NotificationService } from '../lib/notifications';
-import { formatCurrency, InvestmentRequest } from '../lib/supabase';
+import {
+  formatCurrency,
+  formatCurrencyAmount,
+  InvestmentRequest,
+} from '../lib/supabase';
 import AIInsights from './AIInsights';
 
 import StyledDropdown from './StyledDropdown';
@@ -655,7 +659,7 @@ const ApprovalTracker: React.FC = () => {
 
                     <div className="text-right ml-4">
                       <div className="text-lg font-bold text-gray-900">
-                        {formatCurrency(
+                        {formatCurrencyAmount(
                           request.capex + request.opex,
                           request.currency,
                         )}
